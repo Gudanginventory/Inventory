@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gudang Inventory Pro (Firebase)</title>
+    <title>Gudang Inventory Pro</title>
+    <!-- Pustaka SheetJS untuk Fitur Export Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         :root { 
             --primary: #8b5cf6; --bg: #f8fafc; --text-main: #1e293b; --border: #e2e8f0; 
@@ -12,70 +14,108 @@
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text-main); padding: 20px; }
         .container { max-width: 950px; margin: auto; }
         
-        /* Header & Tabs */
-        .header-frame { background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%); color: white; padding: 40px 20px; border-radius: 20px; text-align: center; box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.4); margin-bottom: 20px; }
+        .header-frame { background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%); color: white; padding: 30px 20px; border-radius: 20px; text-shadow: 0 2px 4px rgba(0,0,0,0.2); text-align: center; box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.4); margin-bottom: 20px; }
+        .header-frame h1 { margin: 0 0 5px 0; }
+        .header-datetime { font-size: 0.95rem; font-weight: 500; opacity: 0.9; }
+
         .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
         .tab-btn { padding: 10px 20px; border-radius: 8px; cursor: pointer; background: #e2e8f0; border: none; font-weight: 600; }
         .tab-btn.active { background: var(--primary); color: white; }
         .tab-content { display: none; } .tab-content.active { display: block; }
 
-        /* Card & UI */
         .card { background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 24px; border: 1px solid var(--border); }
         .grid-input { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-top: 15px; }
         input, select, button { padding: 12px; border: 1px solid var(--border); border-radius: 8px; width: 100%; box-sizing: border-box; }
         button { background: var(--primary); color: white; border: none; cursor: pointer; font-weight: 600; }
         
-        /* Rack & Items */
-        .rack-title { font-size: 1.3rem; font-weight: 800; border-bottom: 3px solid var(--primary); padding-bottom: 10px; margin-bottom: 20px; color: var(--primary); margin-top: 20px; }
+        .rack-section { margin-bottom: 25px; }
+        .rack-header-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--primary); padding-bottom: 10px; margin-bottom: 20px; margin-top: 20px; }
+        .rack-title { font-size: 1.3rem; font-weight: 800; color: var(--primary); margin: 0; }
+        .btn-add-pallet-spec { background: #10b981; color: white; font-size: 0.8rem; padding: 6px 12px; border-radius: 6px; width: auto; cursor: pointer; }
+        
         .pallet-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; }
-        .pallet-card { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px; }
-        .pallet-header { font-weight: 700; color: #7c3aed; margin-bottom: 10px; border-bottom: 1px solid #f1f5f9; padding-bottom: 5px; font-size: 0.85rem; }
+        .pallet-card { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px; display: flex; flex-direction: column; justify-content: space-between; }
+        .pallet-header { font-weight: 700; color: #7c3aed; margin-bottom: 10px; border-bottom: 1px solid #f1f5f9; padding-bottom: 5px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; }
         .item-row { padding: 10px 0; border-bottom: 1px solid #f8fafc; font-size: 0.9rem; display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
         
-        /* Modal & Buttons */
+        .pallet-pagination { display: flex; gap: 5px; align-items: center; }
+        .page-btn { padding: 2px 6px; font-size: 0.7rem; background: #e2e8f0; color: var(--text-main); border: none; border-radius: 4px; cursor: pointer; width: auto; }
+        .page-btn.active { background: var(--primary); color: white; }
+
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; overflow-y: auto; }
         .modal-content { background: white; padding: 25px; border-radius: 12px; width: 350px; box-shadow: 0 10px 15px rgba(0,0,0,0.2); }
         .action-btns { display: flex; gap: 5px; flex-wrap: wrap; }
         .btn-action { padding: 6px 10px; font-size: 0.75rem; border-radius: 4px; border: none; cursor: pointer; color: white; font-weight: 600; width: auto; }
         .btn-edit { background: #3b82f6; } .btn-move { background: #10b981; } .btn-take { background: #f59e0b; } .btn-delete { background: #ef4444; }
+
+        .total-stock-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
+        .total-stock-table th, .total-stock-table td { padding: 12px; border: 1px solid var(--border); text-align: left; }
+        .total-stock-table th { background-color: #f1f5f9; color: var(--text-main); font-weight: 600; }
+        .total-stock-table tr:hover { background-color: #f8fafc; }
+
+        /* Status Koneksi di Pojok Kiri Bawah */
+        .status-koneksi {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            background: #e2e8f0;
+            padding: 8px 14px;
+            border-radius: 30px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            z-index: 9999;
+            transition: all 0.3s ease;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .status-online { background: #d1fae5; color: #065f46; border: 1px solid #10b981; }
+        .status-online .status-dot { background: #10b981; }
+        .status-offline { background: #fee2e2; color: #991b1b; border: 1px solid #ef4444; }
+        .status-offline .status-dot { background: #ef4444; }
+
+        #print-sheet { display: none; }
+        @media print {
+            @page { size: auto; margin: 15mm; } 
+            body > *:not(#print-sheet) { display: none !important; }
+            #print-sheet { 
+                display: block !important; 
+                width: 98% !important;
+                margin: 0 auto !important;
+                padding: 0 10px !important;
+                box-sizing: border-box;
+                color: black; 
+            }
+            #print-sheet table { display: table !important; width: 100% !important; border-collapse: collapse !important; }
+            #print-sheet tr { display: table-row !important; }
+            #print-sheet td, #print-sheet th { display: table-cell !important; }
+            .no-print, .status-koneksi { display: none !important; }
+        }
     </style>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-
-        // Konfigurasi Firebase Anda yang sudah aktif
-        const firebaseConfig = {
-            apiKey: "AIzaSyARWs8ITBRl2XRLUbXY5W99Sc8b_YnoyzU",
-            authDomain: "gudang-db160.firebaseapp.com",
-            databaseURL: "https://gudang-db160-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "gudang-db160",
-            storageBucket: "gudang-db160.firebasestorage.app",
-            messagingSenderId: "516496975212",
-            appId: "1:516496975212:web:cca701847789d359d17f49",
-            measurementId: "G-CB06B4NWLB"
-        };
-
-        // Inisialisasi Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-
-        // Ekpos fungsi ke global window agar bisa dipanggil lewat atribut HTML onclick
-        window.db = db;
-        window.dbRefs = { ref, set, onValue, push, remove };
-    </script>
 </head>
 <body>
 
-<datalist id="unitsList">
-    <option value="Pcs"><option value="Dus"><option value="Ikat"><option value="Box"><option value="Pack">
-</datalist>
+<div id="print-sheet"></div>
 
+<!-- Status Online / Offline -->
+<div id="connectionStatus" class="status-koneksi status-online">
+    <span class="status-dot"></span>
+    <span id="statusText">Online</span>
+</div>
+
+<!-- Modal Ambil Barang -->
 <div id="ambilModal" class="modal">
     <div class="modal-content">
         <h3>📥 Ambil Barang</h3>
         <input type="number" id="qtyAmbil" value="1" placeholder="Jumlah" style="margin-bottom: 10px;">
-        <input list="unitsList" id="unitAmbil" placeholder="Satuan" style="margin-bottom: 10px;">
+        <select id="unitAmbil" style="margin-bottom: 10px;"></select>
         <input type="text" id="operatorAmbilModal" placeholder="Nama Operator" style="margin-bottom: 15px; background: #f1f5f9;" readonly>
         <div style="display: flex; gap: 10px;">
             <button onclick="prosesAmbil()" style="background:#10b981; flex:1;">Ambil</button>
@@ -84,13 +124,14 @@
     </div>
 </div>
 
+<!-- Modal Edit Data -->
 <div id="editModal" class="modal">
     <div class="modal-content">
         <h3>✏️ Edit Data Barang</h3>
         <input type="text" id="editNama" placeholder="Nama Barang" style="margin-bottom: 10px;">
         <input type="text" id="editKode" placeholder="Kode Barang" style="margin-bottom: 10px;">
         <input type="number" id="editQty" placeholder="Jumlah Awal" style="margin-bottom: 10px;">
-        <input list="unitsList" id="editUnit" placeholder="Satuan" style="margin-bottom: 10px;">
+        <select id="editUnit" style="margin-bottom: 10px;"></select>
         <input type="number" id="editIsi" placeholder="Isi per Satuan" style="margin-bottom: 10px;">
         <select id="editRack" onchange="updateEditPalletDropdown()" style="margin-bottom: 10px;"></select>
         <select id="editPallet" style="margin-bottom: 15px;"></select>
@@ -101,19 +142,44 @@
     </div>
 </div>
 
+<!-- Modal Pindah Pallet/Rak -->
+<div id="pindahModal" class="modal">
+    <div class="modal-content">
+        <h3>🚚 Pindah Lokasi Barang</h3>
+        <p id="pindahBarangInfo" style="font-weight: 600; font-size: 0.95rem; color: #4f46e5; margin-bottom: 15px;"></p>
+        <label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Rak Tujuan:</label>
+        <select id="pindahRack" onchange="updatePindahPalletDropdown()" style="margin-bottom: 15px; margin-top: 5px;"></select>
+        <label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Pallet Tujuan:</label>
+        <select id="pindahPallet" style="margin-bottom: 20px; margin-top: 5px;"></select>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="prosesPindah()" style="background:#10b981; flex:1;">Pindahkan</button>
+            <button onclick="closeModal('pindahModal')" style="background:#64748b; flex:1;">Batal</button>
+        </div>
+    </div>
+</div>
+
 <div class="container">
-    <header class="header-frame"><h1>Gudang Inventory</h1></header>
+    <header class="header-frame">
+        <h1>Gudang Inventory</h1>
+        <!-- Fitur Waktu dan Tanggal Real-Time -->
+        <div class="header-datetime" id="realtimeClock">Memuat waktu...</div>
+    </header>
+    
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab('gudang', this)">📦 Stok Gudang</button>
         <button class="tab-btn" id="tabBtnPermintaan" onclick="switchTab('permintaan', this)">📝 Permintaan</button>
         <button class="tab-btn" onclick="switchTab('riwayat', this)">📜 Riwayat Keluar</button>
     </div>
 
+    <!-- Tab Stok Gudang -->
     <div id="gudang" class="tab-content active">
         <div class="card">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                <input type="text" id="searchInput" placeholder="🔍 Cari barang atau kode..." oninput="renderAll()">
-                <input type="text" id="operatorInput" placeholder="👤 Nama Operator..." onchange="saveOperator(this.value)">
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 15px;">
+                <input type="text" id="searchInput" placeholder="🔍 Cari nama barang atau kode..." oninput="resetPageAndRender()">
+                <select id="filterRack" onchange="resetPageAndRender()">
+                    <option value="">📁 Semua Rak...</option>
+                </select>
+                <input type="text" id="operatorInput" placeholder="👤 Operator..." onchange="saveOperator(this.value)">
             </div>
         </div>
         <div class="card">
@@ -122,34 +188,61 @@
                 <input id="inputNamaBarang" placeholder="Nama Barang">
                 <input id="inputKodeBarang" placeholder="Kode Barang">
                 <input id="inputQty" type="number" placeholder="Jumlah Awal Satuan">
-                <input list="unitsList" id="unit" placeholder="Satuan (Pcs/Dus/Ikat)">
+                <select id="unit"></select>
                 <input id="inputIsi" type="number" placeholder="Isi per Satuan (jika bukan Pcs)">
                 <select id="selectRack" onchange="updatePalletDropdown()"><option value="">Pilih Rak...</option></select>
                 <select id="selectPallet"><option value="">Pilih Pallet...</option></select>
             </div>
             <button onclick="simpanBarang()" style="margin-top: 15px; width: 100%;">💾 Simpan ke Inventory</button>
         </div>
+        
         <div class="card">
-            <button onclick="toggleRackForm()" style="width: auto; background: #10b981;">➕ Tambah Rak Baru</button>
-            <div id="rackForm" style="display:none; margin-top:15px;">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                <button onclick="toggleForm('rackForm')" style="width: auto; background: #10b981;">➕ Tambah Rak Baru</button>
+                <button onclick="toggleForm('unitForm')" style="width: auto; background: #f59e0b;">🏷️ Tambah Satuan Baru</button>
+                <button onclick="exportStokExcel()" style="width: auto; background: #8b5cf6;">🟢 Export Excel Stok</button>
+            </div>
+            
+            <div id="rackForm" style="display:none; margin-top:15px; border-top: 1px dashed var(--border); padding-top: 15px;">
+                <h4>Form Tambah Rak</h4>
                 <div class="grid-input">
                     <input id="inputNamaRak" placeholder="Nama Rak (Contoh: Rak C)">
                     <input id="inputJmlPallet" type="number" placeholder="Jumlah Pallet">
                     <button onclick="simpanRak()" style="background: #4f46e5;">💾 Simpan Rak</button>
                 </div>
             </div>
+
+            <div id="unitForm" style="display:none; margin-top:15px; border-top: 1px dashed var(--border); padding-top: 15px;">
+                <h4>Form Tambah Satuan Baru</h4>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <input id="inputSatuanBaru" placeholder="Nama Satuan (Contoh: Roll, Pail, Box)">
+                    <button onclick="simpanSatuanBaru()" style="background: #4f46e5; width: auto; white-space: nowrap;">💾 Simpan Satuan</button>
+                </div>
+            </div>
         </div>
+
+        <!-- Wadah Utama Rak dan Pallet -->
         <div id="mainContainer"></div>
+
+        <!-- Total Stok Barang Kontainer Keseluruhan -->
+        <div class="card" style="margin-top: 30px;">
+            <h3>📊 Total Stok Barang Kontainer Keseluruhan</h3>
+            <div id="totalStokBarangContainer"></div>
+        </div>
     </div>
 
+    <!-- Tab Permintaan -->
     <div id="permintaan" class="tab-content">
         <div class="card">
             <h3>📝 Buat Permintaan Barang</h3>
-            <input id="reqNamaPeminta" placeholder="Nama Peminta" style="margin-bottom: 10px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+                <input id="reqNamaPeminta" placeholder="Nama Peminta">
+                <input id="reqDepartemen" placeholder="Departemen (Contoh: Produksi, QA, HRD)">
+            </div>
             <div class="grid-input">
                 <select id="reqNamaBarang" onchange="updateUnitForRequest()"><option value="">Pilih Barang dari Stok...</option></select>
                 <input id="reqQty" type="number" placeholder="Jumlah">
-                <input list="unitsList" id="reqUnit" placeholder="Satuan">
+                <select id="reqUnit"></select>
             </div>
             <button onclick="addToDraft()" style="margin-top: 15px; background: #6366f1;">➕ Tambah ke Daftar</button>
             <hr style="margin: 20px 0; border: 0; border-top: 1px solid #e2e8f0;">
@@ -158,16 +251,23 @@
             <button onclick="kirimPermintaan()" id="btnKirim" style="width: 100%; display:none; background: #10b981;">🚀 Kirim Semua Permintaan</button>
         </div>
         <div class="card">
-            <h3>📋 Daftar Permintaan Terkirim</h3>
-            <input type="text" id="searchPermintaan" placeholder="🔍 Cari peminta/barang..." oninput="renderAll()" style="margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3>📋 Daftar Permintaan Terkirim</h3>
+                <button onclick="exportPermintaanExcel()" style="background: #10b981; width: auto; padding: 8px 15px;">🟢 Export Excel</button>
+            </div>
+            <input type="text" id="searchPermintaan" placeholder="🔍 Cari peminta/departemen/barang..." oninput="renderAll()" style="margin-bottom: 10px;">
             <div id="permintaanContainer"></div>
         </div>
     </div>
 
+    <!-- Tab Riwayat -->
     <div id="riwayat" class="tab-content">
         <div class="card">
-            <h3>📜 Semua Riwayat Keluar</h3>
-            <input type="text" id="searchRiwayat" placeholder="🔍 Cari riwayat (Barang/Operator)..." oninput="renderAll()" style="margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3>📜 Semua Riwayat Keluar</h3>
+                <button onclick="exportRiwayatExcel()" style="background: #10b981; width: auto; padding: 8px 15px;">🟢 Export Excel</button>
+            </div>
+            <input type="text" id="searchRiwayat" placeholder="🔍 Cari riwayat (Barang/Operator)..." oninput="renderAll()" style="margin-5px;">
             <div id="riwayatContainer"></div>
             <button onclick="bersihkanRiwayat()" style="background:#ef4444; margin-top:20px; width: auto;">🗑️ Hapus Semua Riwayat</button>
         </div>
@@ -175,59 +275,52 @@
 </div>
 
 <script>
-    let racks = [ { name: "Rak A", palletCount: 5 }, { name: "Rak B", palletCount: 5 } ];
-    let stok = {};
-    let riwayat = {};
-    let permintaan = {};
+    let defaultRacks = [ { name: "Rak A", palletCount: 5 }, { name: "Rak B", palletCount: 5 } ];
+    let racks = JSON.parse(localStorage.getItem('gudang_racks'));
+    if (!racks || racks.length === 0) { racks = defaultRacks; localStorage.setItem('gudang_racks', JSON.stringify(racks)); }
+
+    let defaultUnits = ["Pcs", "Dus", "Ikat", "Box", "Pack"];
+    let customUnits = JSON.parse(localStorage.getItem('gudang_units'));
+    if (!customUnits || customUnits.length === 0) { customUnits = defaultUnits; localStorage.setItem('gudang_units', JSON.stringify(customUnits)); }
+
+    let stok = JSON.parse(localStorage.getItem('gudang_stok')) || [];
+    let riwayat = JSON.parse(localStorage.getItem('gudang_riwayat')) || [];
+    let permintaan = JSON.parse(localStorage.getItem('gudang_permintaan')) || [];
     let draftItems = [];
-    let currentKey = null;
+    let currentIdx = null;
+
+    let palletPages = {};
 
     document.getElementById('operatorInput').value = localStorage.getItem('gudang_operator') || '';
     function saveOperator(val) { localStorage.setItem('gudang_operator', val); }
 
-    // Jalankan inisialisasi sinkronisasi Firebase setelah SDK siap
-    const checkFirebase = setInterval(() => {
-        if (window.db && window.dbRefs) {
-            clearInterval(checkFirebase);
-            initFirebaseSync();
-        }
-    }, 100);
-
-    function initFirebaseSync() {
-        const { ref, onValue } = window.dbRefs;
-
-        // Mendengarkan Rak
-        onValue(ref(window.db, 'racks'), (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                racks = Object.values(data);
-            } else {
-                window.dbRefs.set(ref(window.db, 'racks'), {
-                    "raka": { name: "Rak A", palletCount: 5 },
-                    "rakb": { name: "Rak B", palletCount: 5 }
-                });
-            }
-            renderAll();
-        });
-
-        // Mendengarkan Stok Barang
-        onValue(ref(window.db, 'stok'), (snapshot) => {
-            stok = snapshot.val() || {};
-            renderAll();
-        });
-
-        // Mendengarkan Riwayat
-        onValue(ref(window.db, 'riwayat'), (snapshot) => {
-            riwayat = snapshot.val() || {};
-            renderAll();
-        });
-
-        // Mendengarkan Permintaan
-        onValue(ref(window.db, 'permintaan'), (snapshot) => {
-            permintaan = snapshot.val() || {};
-            renderAll();
-        });
+    // Fitur Jam dan Tanggal Real-Time
+    function updateClock() {
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('id-ID', options);
+        const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        
+        document.getElementById('realtimeClock').innerHTML = `📅 ${dateStr} &nbsp;|&nbsp; ⏰ ${timeStr}`;
     }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Fitur Deteksi Koneksi Online / Offline
+    function updateConnectionStatus() {
+        const el = document.getElementById('connectionStatus');
+        const text = document.getElementById('statusText');
+        if (navigator.onLine) {
+            el.className = 'status-koneksi status-online';
+            text.innerText = 'Online';
+        } else {
+            el.className = 'status-koneksi status-offline';
+            text.innerText = 'Offline';
+        }
+    }
+    window.addEventListener('online', updateConnectionStatus);
+    window.addEventListener('offline', updateConnectionStatus);
+    updateConnectionStatus(); // Inisialisasi awal
 
     function switchTab(id, btn) {
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -237,22 +330,66 @@
         renderAll();
     }
 
-    function toggleRackForm() { 
-        let f = document.getElementById('rackForm'); 
+    function toggleForm(id) { 
+        let f = document.getElementById(id); 
         f.style.display = (f.style.display === 'none') ? 'block' : 'none'; 
+    }
+
+    function resetPageAndRender() {
+        palletPages = {};
+        renderAll();
+    }
+
+    function setPalletPage(rackName, palletName, pageNum) {
+        palletPages[`${rackName}-${palletName}`] = pageNum;
+        renderAll();
+    }
+
+    function tambahPalletKeRak(rackName) {
+        const rack = racks.find(r => r.name === rackName);
+        if (rack) {
+            rack.palletCount += 1;
+            localStorage.setItem('gudang_racks', JSON.stringify(racks));
+            renderAll();
+            alert(`Berhasil menambahkan "Pallet ${rack.palletCount}" ke dalam ${rackName}!`);
+        }
     }
 
     function simpanRak() {
         const name = document.getElementById('inputNamaRak').value;
         const count = parseInt(document.getElementById('inputJmlPallet').value);
         if(!name || !count) return alert("Isi data rak dengan lengkap!");
-        
-        const { ref, push } = window.dbRefs;
-        push(ref(window.db, 'racks'), { name, palletCount: count });
-        
+        racks.push({ name, palletCount: count });
+        localStorage.setItem('gudang_racks', JSON.stringify(racks));
         document.getElementById('inputNamaRak').value = '';
         document.getElementById('inputJmlPallet').value = '';
-        toggleRackForm();
+        toggleForm('rackForm');
+        renderAll();
+    }
+
+    function simpanSatuanBaru() {
+        let satuanBaru = document.getElementById('inputSatuanBaru').value.trim();
+        if(!satuanBaru) return alert("Nama satuan tidak boleh kosong!");
+        
+        let exists = customUnits.some(u => u.toLowerCase() === satuanBaru.toLowerCase());
+        if(exists) return alert("Satuan tersebut sudah terdaftar!");
+
+        satuanBaru = satuanBaru.charAt(0).toUpperCase() + satuanBaru.slice(1);
+        
+        customUnits.push(satuanBaru);
+        localStorage.setItem('gudang_units', JSON.stringify(customUnits));
+        document.getElementById('inputSatuanBaru').value = '';
+        toggleForm('unitForm');
+        populateUnitDropdowns();
+        alert(`Satuan "${satuanBaru}" berhasil ditambahkan secara permanen!`);
+    }
+
+    function populateUnitDropdowns() {
+        let optionsHtml = '<option value="">Pilih Satuan...</option>' + customUnits.map(u => `<option value="${u}">${u}</option>`).join('');
+        document.getElementById('unit').innerHTML = optionsHtml;
+        document.getElementById('unitAmbil').innerHTML = optionsHtml;
+        document.getElementById('editUnit').innerHTML = customUnits.map(u => `<option value="${u}">${u}</option>`).join('');
+        document.getElementById('reqUnit').innerHTML = optionsHtml;
     }
 
     function updatePalletDropdown() {
@@ -271,13 +408,25 @@
         if(rack) { for(let i = 1; i <= rack.palletCount; i++) { palletSelect.innerHTML += `<option value="Pallet ${i}">Pallet ${i}</option>`; } }
     }
 
+    function updatePindahPalletDropdown() {
+        const rackName = document.getElementById('pindahRack').value;
+        const palletSelect = document.getElementById('pindahPallet');
+        palletSelect.innerHTML = '';
+        const rack = racks.find(r => r.name === rackName);
+        if(rack) { 
+            for(let i = 1; i <= rack.palletCount; i++) { 
+                palletSelect.innerHTML += `<option value="Pallet ${i}">Pallet ${i}</option>`; 
+            } 
+        }
+    }
+
     function addToDraft() {
         const itemName = document.getElementById('reqNamaBarang').value;
         const qty = parseInt(document.getElementById('reqQty').value);
         const unit = document.getElementById('reqUnit').value;
         if(!itemName || !qty || !unit) return alert("Pilih barang, isi jumlah, dan satuan!");
         
-        const itemInStok = Object.values(stok).find(s => s.item === itemName);
+        const itemInStok = stok.find(s => s.item === itemName);
         const isi = itemInStok ? itemInStok.isiPerUnit : 1;
         const totalPcs = qty * (unit.toLowerCase() !== 'pcs' ? isi : 1);
 
@@ -300,48 +449,178 @@
     }
 
     function kirimPermintaan() {
-        let op = localStorage.getItem('gudang_operator');
-        if(!op || op.trim() === "") return alert("Wajib mengisi 'Nama Operator' di bagian atas halaman!");
         const peminta = document.getElementById('reqNamaPeminta').value;
+        const departemen = document.getElementById('reqDepartemen').value || "-";
         if(!peminta) return alert("Isi Nama Peminta terlebih dahulu!");
         
-        const { ref, push } = window.dbRefs;
-        push(ref(window.db, 'permintaan'), { 
+        permintaan.push({ 
             peminta, 
+            departemen, 
             items: draftItems, 
             tanggal: new Date().toLocaleDateString(), 
             status: 'pending', 
             operator: '' 
         });
-
+        
+        localStorage.setItem('gudang_permintaan', JSON.stringify(permintaan));
         draftItems = [];
         document.getElementById('reqNamaPeminta').value = '';
+        document.getElementById('reqDepartemen').value = '';
         renderDraft();
+        renderAll();
         alert("Permintaan berhasil dikirim!");
     }
 
-    function selesaikanPermintaan(key) {
+    function selesaikanPermintaan(idx) {
         let op = localStorage.getItem('gudang_operator');
-        if(!op || op.trim() === "") return alert("Wajib mengisi 'Nama Operator' di bagian atas halaman!");
+        if(!op || op.trim() === "") {
+            return alert("Wajib mengisi 'Nama Operator' di bagian atas halaman sebelum menyelesaikan permintaan!");
+        }
         
-        const { ref, set } = window.dbRefs;
-        permintaan[key].status = 'done';
-        permintaan[key].operator = op;
-        set(ref(window.db, `permintaan/${key}`), permintaan[key]);
+        permintaan[idx].status = 'done';
+        permintaan[idx].operator = op; 
+        
+        localStorage.setItem('gudang_permintaan', JSON.stringify(permintaan));
+        renderAll();
+        alert(`Permintaan diselesaikan oleh: ${op}`);
     }
 
-    function hapusPermintaan(key) {
+    function hapusPermintaan(idx) {
         if(confirm("Apakah Anda yakin ingin menghapus permintaan ini dari daftar?")) {
-            const { ref, remove } = window.dbRefs;
-            remove(ref(window.db, `permintaan/${key}`));
+            permintaan.splice(idx, 1);
+            localStorage.setItem('gudang_permintaan', JSON.stringify(permintaan));
+            renderAll();
         }
+    }
+
+    function cetakForm(idx) {
+        const p = permintaan[idx];
+        const namaPemberi1 = p.status === 'done' ? p.operator : '-';
+        const departemenName = p.departemen || '-';
+        const pSheet = document.getElementById('print-sheet');
+        pSheet.innerHTML = `
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h2 style="margin:0; text-transform: uppercase;">FORM PERMINTAAN BARANG</h2>
+            </div>
+            <table style="width: 100%; border: 1px solid #000; border-collapse: collapse; margin-bottom: 30px;">
+                <tr>
+                    <td style="border: 1px solid #000; padding: 10px; width: 50%;"><strong>Nama Peminta :</strong> ${p.peminta}</td>
+                    <td style="border: 1px solid #000; padding: 10px; width: 50%;"><strong>Departemen :</strong> ${departemenName}</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #000; padding: 10px; width: 50%;"><strong>Tanggal :</strong> ${p.tanggal}</td>
+                    <td style="border: 1px solid #000; padding: 10px; width: 50%;"><strong>Status Permintaan :</strong> ${p.status.toUpperCase()}</td>
+                </tr>
+            </table>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
+                <thead>
+                    <tr style="background: #333; color: white;">
+                        <th style="border: 1px solid #000; padding: 8px; width: 5%;">No</th>
+                        <th style="border: 1px solid #000; padding: 8px; text-align: left;">Nama Barang</th>
+                        <th style="border: 1px solid #000; padding: 8px;">Jumlah</th>
+                        <th style="border: 1px solid #000; padding: 8px;">Satuan</th>
+                        <th style="border: 1px solid #000; padding: 8px;">Total Pcs</th>
+                        <th style="border: 1px solid #000; padding: 8px; width: 25%;">Pemberi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${p.items.map((item, i) => `
+                        <tr>
+                            <td style="border: 1px solid #000; padding: 8px; text-align:center;">${i+1}</td>
+                            <td style="border: 1px solid #000; padding: 8px;">${item.item}</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.qty}</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.unit}</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.totalPcs}</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold; background: #fafafa;">${namaPemberi1}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            
+            <div style="display: flex; justify-content: flex-end; text-align: center; margin-top: 50px; padding-right: 50px;">
+                <div style="width: 200px;">
+                    Peminta,<br><br><br><br><br>
+                    ( <b>${p.peminta}</b> )
+                </div>
+            </div>
+        `;
+        window.print();
+    }
+
+    function cetakSemuaUserHariIni(nama) {
+        const today = new Date().toLocaleDateString();
+        const userReqs = permintaan.filter(p => p.peminta === nama && p.tanggal === today);
+        
+        if (userReqs.length === 0) return alert("Tidak ada permintaan untuk user ini hari ini.");
+
+        let allItems = [];
+        let depts = [...new Set(userReqs.map(p => p.departemen || "-"))].join(', ');
+        
+        userReqs.forEach(p => { 
+            p.items.forEach(item => {
+                allItems.push({
+                    ...item,
+                    operator: p.status === 'done' ? p.operator : '-'
+                });
+            });
+        });
+
+        const pSheet = document.getElementById('print-sheet');
+        pSheet.innerHTML = `
+            <div style="text-align: center; margin-bottom: 20px;"><h2>REKAP PERMINTAAN HARIAN</h2></div>
+            <table style="width: 100%; border: 1px solid #000; border-collapse: collapse; margin-bottom: 20px;">
+                <tr>
+                    <td style="border: 1px solid #000; padding: 10px;"><strong>Nama Peminta:</strong> ${nama}</td>
+                    <td style="border: 1px solid #000; padding: 10px;"><strong>Departemen:</strong> ${depts}</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #000; padding: 10px;" colspan="2"><strong>Tanggal:</strong> ${today}</td>
+                </tr>
+            </table>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
+                <thead>
+                    <tr style="background: #333; color: white;">
+                        <th style="border: 1px solid #000; padding: 8px;">No</th>
+                        <th style="border: 1px solid #000; padding: 8px;">Nama Barang</th>
+                        <th style="border: 1px solid #000; padding: 8px;">Jumlah</th>
+                        <th style="border: 1px solid #000; padding: 8px;">Satuan</th>
+                        <th style="border: 1px solid #000; padding: 8px;">Total Pcs</th>
+                        <th style="border: 1px solid #000; padding: 8px; width: 25%;">Pemberi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${allItems.map((item, i) => `
+                        <tr>
+                            <td style="border: 1px solid #000; padding: 8px; text-align:center;">${i+1}</td>
+                            <td style="border: 1px solid #000; padding: 8px;">${item.item}</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align:center;">${item.qty}</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align:center;">${item.unit}</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align:center;">${item.totalPcs}</td>
+                            <td style="border: 1px solid #000; padding: 8px; text-align:center; font-weight: bold; background: #fafafa;">${item.operator}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            
+            <div style="display: flex; justify-content: flex-end; text-align: center; margin-top: 50px; padding-right: 50px;">
+                <div style="width: 200px;">
+                    Peminta,<br><br><br><br><br>
+                    ( <b>${nama}</b> )
+                </div>
+            </div>
+        `;
+
+        setTimeout(() => {
+            window.print();
+            setTimeout(() => { pSheet.innerHTML = ''; }, 1000);
+        }, 500);
     }
 
     function simpanBarang() {
         let op = localStorage.getItem('gudang_operator');
         if(!op || op.trim() === "") return alert("Wajib mengisi 'Nama Operator' di bagian atas halaman!");
         const item = document.getElementById('inputNamaBarang').value;
-        const code = document.getElementById('inputKodeBarang').value;
+        const code = document.getElementById('inputKodeBarang').value; 
         const qty = parseInt(document.getElementById('inputQty').value);
         const unit = document.getElementById('unit').value;
         const isi = parseInt(document.getElementById('inputIsi').value) || 1;
@@ -349,25 +628,24 @@
         const pallet = document.getElementById('selectPallet').value;
         if(!item || isNaN(qty) || !unit || !rack || !pallet) return alert("Lengkapi data barang, jumlah, rak, dan pallet!");
         let multiplier = (unit.toLowerCase() !== 'pcs') ? isi : 1;
-        
-        const { ref, push } = window.dbRefs;
-        push(ref(window.db, 'stok'), { item, code, qty, unit, isiPerUnit: isi, totalPcs: qty * multiplier, rack, pallet });
-
+        stok.push({ item, code, qty, unit, isiPerUnit: isi, totalPcs: qty * multiplier, rack, pallet });
+        localStorage.setItem('gudang_stok', JSON.stringify(stok));
         document.getElementById('inputNamaBarang').value = '';
         document.getElementById('inputKodeBarang').value = '';
         document.getElementById('inputQty').value = '';
         document.getElementById('unit').value = '';
         document.getElementById('inputIsi').value = '';
+        renderAll();
     }
     
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    function openAmbilModal(key) { currentKey = key; document.getElementById('ambilModal').style.display = 'flex'; document.getElementById('operatorAmbilModal').value = localStorage.getItem('gudang_operator') || ''; }
+    function openAmbilModal(idx) { currentIdx = idx; document.getElementById('ambilModal').style.display = 'flex'; document.getElementById('operatorAmbilModal').value = localStorage.getItem('gudang_operator') || ''; }
     
-    function openEditModal(key) {
-        currentKey = key;
-        let item = stok[key];
+    function openEditModal(idx) {
+        currentIdx = idx;
+        let item = stok[idx];
         document.getElementById('editNama').value = item.item;
-        document.getElementById('editKode').value = item.code || '';
+        document.getElementById('editKode').value = item.code || ''; 
         document.getElementById('editQty').value = item.qty;
         document.getElementById('editUnit').value = item.unit;
         document.getElementById('editIsi').value = item.isiPerUnit;
@@ -379,7 +657,7 @@
     }
 
     function saveEdit() {
-        let item = stok[currentKey];
+        let item = stok[currentIdx];
         item.item = document.getElementById('editNama').value;
         item.code = document.getElementById('editKode').value;
         item.qty = parseInt(document.getElementById('editQty').value);
@@ -389,22 +667,43 @@
         item.pallet = document.getElementById('editPallet').value;
         let multiplier = (item.unit.toLowerCase() !== 'pcs') ? item.isiPerUnit : 1;
         item.totalPcs = item.qty * multiplier;
-        
-        const { ref, set } = window.dbRefs;
-        set(ref(window.db, `stok/${currentKey}`), item);
+        localStorage.setItem('gudang_stok', JSON.stringify(stok));
+        renderAll();
         closeModal('editModal');
     }
 
-    function pindahBarang(key) {
-        let item = stok[key];
-        let r = prompt("Pindah ke nama Rak baru:", item.rack);
-        let p = prompt("Pindah ke nomor Pallet baru (Contoh: Pallet 1):", item.pallet);
-        if(r && p) {
-            item.rack = r;
-            item.pallet = p;
-            const { ref, set } = window.dbRefs;
-            set(ref(window.db, `stok/${key}`), item);
+    function openPindahModal(idx) {
+        currentIdx = idx;
+        let item = stok[idx];
+        
+        document.getElementById('pindahBarangInfo').innerText = `${item.item} (Asal: ${item.rack} - ${item.pallet})`;
+        
+        const pindahRack = document.getElementById('pindahRack');
+        pindahRack.innerHTML = racks.map(r => `<option value="${r.name}" ${r.name === item.rack ? 'selected' : ''}>${r.name}</option>`).join('');
+        
+        updatePindahPalletDropdown();
+        document.getElementById('pindahPallet').value = item.pallet;
+        
+        document.getElementById('pindahModal').style.display = 'flex';
+    }
+
+    function prosesPindah() {
+        let item = stok[currentIdx];
+        const rackBaru = document.getElementById('pindahRack').value;
+        const palletBaru = document.getElementById('pindahPallet').value;
+        
+        if (!rackBaru || !palletBaru) {
+            return alert("Silakan pilih rak dan pallet tujuan!");
         }
+
+        item.rack = rackBaru;
+        item.pallet = palletBaru;
+        
+        localStorage.setItem('gudang_stok', JSON.stringify(stok));
+        alert(`Berhasil memindahkan barang ke ${rackBaru} - ${palletBaru}`);
+        
+        closeModal('pindahModal');
+        renderAll();
     }
     
     function prosesAmbil() {
@@ -415,55 +714,31 @@
         let unit = document.getElementById('unitAmbil').value;
         if(isNaN(ambil) || !unit) return alert("Isi jumlah dan satuan pengambilan!");
         
-        let item = stok[currentKey];
+        let item = stok[currentIdx];
         let multiplier = (unit.toLowerCase() !== 'pcs') ? item.isiPerUnit : 1;
         let totalAmbil = ambil * multiplier;
         
         if(totalAmbil <= 0) return alert("Jumlah tidak valid!");
         if(totalAmbil > item.totalPcs) return alert("Stok di pallet tidak mencukupi!");
         
-        const { ref, push, set, remove } = window.dbRefs;
-
-        push(ref(window.db, 'riwayat'), { 
-            item: item.item, 
-            jumlahDisplay: `${ambil} ${unit}`, 
-            jumlahPcs: totalAmbil, 
-            operator: operator, 
-            dari: `${item.rack} - ${item.pallet}`, 
-            tanggal: new Date().toLocaleString() 
-        });
+        riwayat.push({ item: item.item, jumlahDisplay: `${ambil} ${unit}`, jumlahPcs: totalAmbil, operator: operator, dari: `${item.rack} - ${item.pallet}`, tanggal: new Date().toLocaleString() });
+        localStorage.setItem('gudang_riwayat', JSON.stringify(riwayat));
         
         item.totalPcs -= totalAmbil;
-        if (item.totalPcs <= 0) {
-            remove(ref(window.db, `stok/${currentKey}`));
-        } else {
-            let displayMultiplier = (item.unit.toLowerCase() !== 'pcs') ? item.isiPerUnit : 1;
-            item.qty = Math.ceil(item.totalPcs / displayMultiplier);
-            set(ref(window.db, `stok/${currentKey}`), item);
-        }
+        if (item.totalPcs <= 0) stok.splice(currentIdx, 1);
         
+        localStorage.setItem('gudang_stok', JSON.stringify(stok));
         document.getElementById('qtyAmbil').value = '1';
         document.getElementById('unitAmbil').value = '';
-        closeModal('ambilModal');
+        renderAll(); closeModal('ambilModal');
     }
     
-    function hapusBarang(key) { 
-        if(confirm("Apakah Anda yakin ingin menghapus item ini?")) { 
-            const { ref, remove } = window.dbRefs;
-            remove(ref(window.db, `stok/${key}`)); 
-        } 
-    }
-    
-    function bersihkanRiwayat() { 
-        if(confirm("Hapus semua riwayat keluar?")) { 
-            const { ref, remove } = window.dbRefs;
-            remove(ref(window.db, 'riwayat')); 
-        } 
-    }
+    function hapusBarang(idx) { if(confirm("Apakah Anda yakin ingin menghapus item ini?")) { stok.splice(idx, 1); localStorage.setItem('gudang_stok', JSON.stringify(stok)); renderAll(); } }
+    function bersihkanRiwayat() { if(confirm("Hapus semua riwayat keluar?")) { riwayat = []; localStorage.setItem('gudang_riwayat', JSON.stringify(riwayat)); renderAll(); } }
 
     function updateUnitForRequest() {
         const itemName = document.getElementById('reqNamaBarang').value;
-        const itemInStok = Object.values(stok).find(s => s.item === itemName);
+        const itemInStok = stok.find(s => s.item === itemName);
         if (itemInStok) {
             document.getElementById('reqUnit').value = itemInStok.unit;
         } else {
@@ -472,48 +747,59 @@
     }
 
     function renderAll() {
-        // --- Render Permintaan ---
         let searchPerm = document.getElementById('searchPermintaan').value.toLowerCase();
-        let listPermintaan = Object.keys(permintaan).map(key => ({ key, ...permintaan[key] }));
-        let filteredPerm = listPermintaan.filter(p => p.peminta.toLowerCase().includes(searchPerm) || (p.items && p.items.some(i => i.item.toLowerCase().includes(searchPerm))));
+        let filteredPerm = permintaan.filter(p => 
+            p.peminta.toLowerCase().includes(searchPerm) || 
+            (p.departemen && p.departemen.toLowerCase().includes(searchPerm)) ||
+            p.items.some(i => i.item.toLowerCase().includes(searchPerm))
+        );
         
-        let pending = listPermintaan.filter(p => p.status === 'pending').length;
+        let pending = permintaan.filter(p => p.status === 'pending').length;
         document.getElementById('tabBtnPermintaan').innerHTML = pending > 0 ? `📝 Permintaan <span style="background:#ef4444; color:white; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:bold;">${pending}</span>` : `📝 Permintaan`;
         
         const reqSelect = document.getElementById('reqNamaBarang');
-        reqSelect.innerHTML = '<option value="">Pilih Barang dari Stok...</option>' + [...new Set(Object.values(stok).map(s => s.item))].map(name => `<option value="${name}">${name}</option>`).join('');
+        reqSelect.innerHTML = '<option value="">Pilih Barang dari Stok...</option>' + [...new Set(stok.map(s => s.item))].map(name => `<option value="${name}">${name}</option>`).join('');
         
         let pContainer = document.getElementById('permintaanContainer');
         pContainer.innerHTML = '';
         let pemintas = [...new Set(filteredPerm.map(p => p.peminta))];
         
         pemintas.forEach(nama => {
-            pContainer.innerHTML += `<div style="font-weight:bold; margin-top:20px; color:#8b5cf6; border-bottom:2px solid #8b5cf6; padding-bottom:5px;">👤 Peminta: ${nama}</div>`;
             let userReqs = filteredPerm.filter(p => p.peminta === nama);
+            let userDepts = [...new Set(userReqs.map(p => p.departemen || "-"))].join(', ');
+            pContainer.innerHTML += `
+                <div style="font-weight:bold; margin-top:20px; color:#8b5cf6; border-bottom:2px solid #8b5cf6; padding-bottom:5px; display:flex; justify-content:space-between; align-items:center;">
+                    <span>👤 Peminta: ${nama} <span style="font-size:0.85rem; color:#64748b; font-weight:normal;">(${userDepts})</span></span>
+                    <button onclick="cetakSemuaUserHariIni('${nama}')" style="background:#6366f1; padding:4px 8px; font-size:11px; cursor:pointer; color:white; border:none; border-radius:4px;" class="no-print">🖨️ Cetak Semua Hari Ini</button>
+                </div>
+            `;
+            
             userReqs.forEach(p => {
+                let actualIdx = permintaan.indexOf(p);
                 let isDone = p.status === 'done';
                 let itemText = (p.items || []).map(i => `${i.item} (${i.qty} ${i.unit} / <b>${i.totalPcs} Pcs</b>)`).join(', ');
                 pContainer.innerHTML += `
                     <div class="item-row" style="flex-direction:row; justify-content:space-between; align-items:center; background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:8px; border:1px solid #e2e8f0;">
                         <span style="${isDone ? 'text-decoration: line-through; color: #94a3b8;' : ''}">
+                            <b>Peminta: ${p.peminta}</b> - <small style="color:#64748b;">(Tgl: ${p.tanggal})</small><br>
+                            Departemen: <span style="color:#059669; font-weight:600;">${p.departemen || '-'}</span><br>
                             Permintaan: <span style="color:#8b5cf6; font-weight:600;">${itemText}</span>
                             ${isDone ? `<br><small style="color:#64748b;">Diserahkan oleh: <b>${p.operator}</b></small>` : ''}
                         </span>
-                        <div style="display:flex; gap:5px;">
-                            ${!isDone ? `<button onclick="selesaikanPermintaan('${p.key}')" style="background:#10b981; width:auto; padding:6px 14px; font-size:12px;">✅ Selesai</button>` : '<span style="font-size:1.2rem;">✅</span>'}
-                            <button onclick="hapusPermintaan('${p.key}')" style="background:#ef4444; width:auto; padding:6px 14px; font-size:12px;">❌</button>
+                        <div style="display:flex; gap:5px;" class="no-print">
+                            <button onclick="cetakForm(${actualIdx})" style="background:#64748b; width:auto; padding:6px 14px; font-size:12px;">🖨️ Cetak</button>
+                            ${!isDone ? `<button onclick="selesaikanPermintaan(${actualIdx})" style="background:#10b981; width:auto; padding:6px 14px; font-size:12px;">✅ Selesai</button>` : '<span style="font-size:1.2rem;">✅</span>'}
+                            <button onclick="hapusPermintaan(${actualIdx})" style="background:#ef4444; width:auto; padding:6px 14px; font-size:12px;">❌</button>
                         </div>
                     </div>
                 `;
             });
         });
 
-        // --- Render Riwayat ---
         let searchR = document.getElementById('searchRiwayat').value.toLowerCase();
         let rContainer = document.getElementById('riwayatContainer');
         rContainer.innerHTML = '';
-        let listRiwayat = Object.keys(riwayat).map(key => ({ key, ...riwayat[key] }));
-        let filteredRiwayat = listRiwayat.filter(r => r.item.toLowerCase().includes(searchR) || r.operator.toLowerCase().includes(searchR));
+        let filteredRiwayat = riwayat.filter(r => r.item.toLowerCase().includes(searchR) || r.operator.toLowerCase().includes(searchR));
         let operators = [...new Set(filteredRiwayat.map(r => r.operator))];
         
         operators.forEach(op => {
@@ -528,46 +814,273 @@
             `).join('');
         });
 
-        // --- Render Stok ---
         const rackSelect = document.getElementById('selectRack');
         let currentRackVal = rackSelect.value;
         rackSelect.innerHTML = '<option value="">Pilih Rak...</option>' + racks.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
         if(currentRackVal) rackSelect.value = currentRackVal;
+
+        const filterRackSelect = document.getElementById('filterRack');
+        let currentFilterRackVal = filterRackSelect.value;
+        filterRackSelect.innerHTML = '<option value="">📁 Semua Rak...</option>' + racks.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
+        if(currentFilterRackVal) filterRackSelect.value = currentFilterRackVal;
         
-        const search = document.getElementById('searchInput').value.toLowerCase();
+        const search = document.getElementById('searchInput').value.trim().toLowerCase();
+        const filterRackValue = filterRackSelect.value;
         const mContainer = document.getElementById('mainContainer'); 
         mContainer.innerHTML = '';
         
-        let listStok = Object.keys(stok).map(key => ({ key, ...stok[key] }));
+        let totalStokPerItem = {};
+
+        if (search === "" && filterRackValue === "") {
+            mContainer.innerHTML = `<div style="color:#94a3b8; text-align:center; padding:30px; border: 2px dashed #cbd5e1; border-radius:12px; font-weight:500;">Silakan pilih rak atau ketik nama/kode barang untuk memuat data visual.</div>`;
+            renderTabelTotalStok({}); 
+            return;
+        }
 
         racks.forEach(r => {
-            let filteredItems = listStok.filter(s => s.rack === r.name && (s.item.toLowerCase().includes(search) || (s.code && s.code.toLowerCase().includes(search))));
-            mContainer.innerHTML += `<div class="rack-section"><div class="rack-title">${r.name}</div><div class="pallet-container" id="cont-${r.name}"></div></div>`;
-            const pCont = document.getElementById(`cont-${r.name}`);
-            
+            if (filterRackValue !== "" && r.name !== filterRackValue) {
+                return;
+            }
+
+            let finalPalletsHtml = "";
+            let matchInRack = false; 
+
             for(let i = 1; i <= r.palletCount; i++) {
                 const pName = `Pallet ${i}`; 
-                const items = filteredItems.filter(s => s.pallet === pName);
-                let itemsHtml = items.map((it) => { 
+                const items = stok.filter(s => s.rack === r.name && s.pallet === pName);
+                
+                const matchedItems = items.filter(it => 
+                    it.item.toLowerCase().includes(search) || 
+                    (it.code && it.code.toLowerCase().includes(search))
+                );
+
+                if (search !== "" && matchedItems.length === 0) {
+                    continue;
+                }
+
+                let displayItems = search !== "" ? matchedItems : items;
+
+                if (displayItems.length === 0) {
+                    if (search !== "") {
+                        continue;
+                    }
+                }
+
+                matchInRack = true; 
+
+                const itemsPerPage = 5;
+                const totalItems = displayItems.length;
+                const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+                
+                const pageKey = `${r.name}-${pName}`;
+                if (!palletPages[pageKey]) {
+                    palletPages[pageKey] = 1;
+                }
+                
+                let currentPage = palletPages[pageKey];
+                if (currentPage > totalPages) {
+                    currentPage = totalPages;
+                    palletPages[pageKey] = totalPages;
+                }
+
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                const paginatedItems = displayItems.slice(startIndex, endIndex);
+
+                let itemsHtml = paginatedItems.map((it) => { 
+                    let id = stok.indexOf(it); 
                     let infoDisplay = `${it.totalPcs} Pcs`; 
                     if(it.unit.toLowerCase() !== 'pcs') infoDisplay += ` (${Math.ceil(it.totalPcs/it.isiPerUnit)} ${it.unit})`;
                     let codeDisplay = it.code ? `<br><small style="color:#6366f1;">Kode: ${it.code}</small>` : '';
+                    
                     return `
                         <div class="item-row">
                             <div><b>${it.item}</b>${codeDisplay}<br><small style="color:#64748b;">Stok: ${infoDisplay}</small></div>
                             <div class="action-btns">
-                                <button class="btn-action btn-edit" onclick="openEditModal('${it.key}')">✏️ Edit</button>
-                                <button class="btn-action btn-move" onclick="pindahBarang('${it.key}')">🚚 Pindah</button>
-                                <button class="btn-action btn-take" onclick="openAmbilModal('${it.key}')">📥 Ambil</button>
-                                <button class="btn-action btn-delete" onclick="hapusBarang('${it.key}')">❌ Hapus</button>
+                                <button class="btn-action btn-edit" onclick="openEditModal(${id})">✏️ Edit</button>
+                                <button class="btn-action btn-move" onclick="openPindahModal(${id})">🚚 Pindah</button>
+                                <button class="btn-action btn-take" onclick="openAmbilModal(${id})">📥 Ambil</button>
+                                <button class="btn-action btn-delete" onclick="hapusBarang(${id})">❌ Hapus</button>
                             </div>
                         </div>
                     `; 
                 }).join('');
-                pCont.innerHTML += `<div class="pallet-card"><div class="pallet-header">📦 ${pName}</div>${itemsHtml || '<div style="color:#cbd5e1; font-size:0.85rem; text-align:center; padding:10px 0;">Kosong</div>'}</div>`;
+
+                if (itemsHtml === "") {
+                    itemsHtml = `<div style="color: #94a3b8; font-size: 0.8rem; text-align: center; padding: 10px;">Kosong</div>`;
+                }
+
+                let paginationHtml = "";
+                if (totalPages > 1) {
+                    let pageButtons = "";
+                    for (let pNum = 1; pNum <= totalPages; pNum++) {
+                        pageButtons += `
+                            <button class="page-btn ${pNum === currentPage ? 'active' : ''}" onclick="setPalletPage('${r.name}', '${pName}', ${pNum})">
+                                ${pNum}
+                            </button>
+                        `;
+                    }
+                    paginationHtml = `
+                        <div class="pallet-pagination">
+                            <span style="font-size: 0.7rem; color: #64748b; margin-right: 3px;">Hal:</span>
+                            ${pageButtons}
+                        </div>
+                    `;
+                }
+
+                displayItems.forEach(it => {
+                    if (!totalStokPerItem[it.item]) {
+                        totalStokPerItem[it.item] = { code: it.code || '-', totalPcs: 0, unit: it.unit, isi: it.isiPerUnit };
+                    }
+                    totalStokPerItem[it.item].totalPcs += it.totalPcs;
+                });
+                
+                finalPalletsHtml += `
+                    <div class="pallet-card">
+                        <div class="pallet-header">
+                            <span>📦 ${pName} <small style="font-weight: normal; color: #94a3b8;">(${totalItems} item)</small></span>
+                            ${paginationHtml}
+                        </div>
+                        <div style="flex-grow: 1;">
+                            ${itemsHtml}
+                        </div>
+                    </div>`;
+            }
+
+            if (!matchInRack) {
+                return;
+            }
+
+            if (finalPalletsHtml !== "") {
+                let rackHtml = `
+                    <div class="rack-section">
+                        <div class="rack-header-row">
+                            <h2 class="rack-title">${r.name}</h2>
+                            <button class="btn-add-pallet-spec" onclick="tambahPalletKeRak('${r.name}')">➕ Pallet</button>
+                        </div>
+                        <div class="pallet-container">${finalPalletsHtml}</div>
+                    </div>
+                `;
+                mContainer.insertAdjacentHTML('beforeend', rackHtml);
             }
         });
+
+        renderTabelTotalStok(totalStokPerItem);
     }
+
+    function renderTabelTotalStok(dataTotal) {
+        const container = document.getElementById('totalStokBarangContainer');
+        let keys = Object.keys(dataTotal);
+        
+        if(keys.length === 0) {
+            container.innerHTML = `<div style="color:#94a3b8; text-align:center; padding:15px; font-size:0.9rem;">Belum ada data barang. Silakan lakukan pencarian atau pilih filter rak terlebih dahulu.</div>`;
+            return;
+        }
+
+        let tableRows = keys.map((itemName, index) => {
+            let item = dataTotal[itemName];
+            let konversiSatuan = `${item.totalPcs} Pcs`;
+            if(item.unit.toLowerCase() !== 'pcs') {
+                konversiSatuan += ` (${Math.ceil(item.totalPcs / item.isi)} ${item.unit})`;
+            }
+            return `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td><b>${itemName}</b></td>
+                    <td><span style="color:#6366f1; font-weight:600;">${item.code}</span></td>
+                    <td><b>${konversiSatuan}</b></td>
+                </tr>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <table class="total-stock-table">
+                <thead>
+                    <tr>
+                        <th style="width: 5%;">No</th>
+                        <th>Nama Barang</th>
+                        <th>Kode Barang</th>
+                        <th>Total Akumulasi Stok</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+        `;
+    }
+
+    function exportStokExcel() {
+        if (stok.length === 0) return alert("Tidak ada data stok untuk diexport!");
+        
+        let dataMap = stok.map((s, index) => ({
+            "No": index + 1,
+            "Nama Barang": s.item,
+            "Kode Barang": s.code || "-",
+            "Jumlah Satuan": s.qty,
+            "Satuan": s.unit,
+            "Isi Per Satuan": s.isiPerUnit,
+            "Total (Pcs)": s.totalPcs,
+            "Lokasi Rak": s.rack,
+            "Lokasi Pallet": s.pallet
+        }));
+        
+        let ws = XLSX.utils.json_to_sheet(dataMap);
+        let wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Stok Gudang");
+        XLSX.writeFile(wb, "Data_Stok_Gudang.xlsx");
+    }
+
+    function exportPermintaanExcel() {
+        if (permintaan.length === 0) return alert("Tidak ada data permintaan untuk diexport!");
+        
+        let dataMap = [];
+        let no = 1;
+        
+        permintaan.forEach(p => {
+            p.items.forEach(item => {
+                dataMap.push({
+                    "No": no++,
+                    "Tanggal": p.tanggal,
+                    "Nama Peminta": p.peminta,
+                    "Departemen": p.departemen || "-",
+                    "Nama Barang": item.item,
+                    "Jumlah": item.qty,
+                    "Satuan": item.unit,
+                    "Total Pcs": item.totalPcs,
+                    "Status": p.status === 'done' ? 'Selesai' : 'Pending',
+                    "Operator Penanggung Jawab": p.operator || "-"
+                });
+            });
+        });
+        
+        let ws = XLSX.utils.json_to_sheet(dataMap);
+        let wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Permintaan");
+        XLSX.writeFile(wb, "Data_Permintaan_Barang.xlsx");
+    }
+
+    function exportRiwayatExcel() {
+        if (riwayat.length === 0) return alert("Tidak ada data riwayat untuk diexport!");
+        
+        let dataMap = riwayat.map((r, index) => ({
+            "No": index + 1,
+            "Tanggal & Waktu": r.tanggal,
+            "Nama Barang": r.item,
+            "Jumlah Pengambilan": r.jumlahDisplay,
+            "Total (Pcs)": r.jumlahPcs,
+            "Asal Lokasi": r.dari,
+            "Operator": r.operator
+        }));
+        
+        let ws = XLSX.utils.json_to_sheet(dataMap);
+        let wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Riwayat Keluar");
+        XLSX.writeFile(wb, "Data_Riwayat_Keluar.xlsx");
+    }
+
+    populateUnitDropdowns();
+    renderAll();
 </script>
 </body>
 </html>
