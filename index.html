@@ -14,9 +14,24 @@
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text-main); padding: 20px; }
         .container { max-width: 950px; margin: auto; }
         
-        .header-frame { background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%); color: white; padding: 30px 20px; border-radius: 20px; text-shadow: 0 2px 4px rgba(0,0,0,0.2); text-align: center; box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.4); margin-bottom: 20px; }
+        .header-frame { background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%); color: white; padding: 30px 20px; border-radius: 20px; text-shadow: 0 2px 4px rgba(0,0,0,0.2); text-align: center; box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.4); margin-bottom: 20px; position: relative; }
         .header-frame h1 { margin: 0 0 5px 0; }
         .header-datetime { font-size: 0.95rem; font-weight: 500; opacity: 0.9; }
+        .btn-logout { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); border: 1px solid white; padding: 6px 12px; border-radius: 6px; color: white; cursor: pointer; font-size: 0.85rem; width: auto; }
+        .btn-logout:hover { background: rgba(255,255,255,0.4); }
+
+        /* Login Style */
+        .login-screen { display: flex; justify-content: center; align-items: center; min-height: 80vh; }
+        .login-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); width: 100%; max-width: 400px; border: 1px solid var(--border); }
+        .login-card h2 { text-align: center; margin-bottom: 20px; color: var(--primary); }
+        .login-card label { font-size: 0.85rem; font-weight: 600; color: #64748b; display: block; margin-bottom: 5px; }
+        .login-card select { margin-bottom: 15px; }
+
+        /* Password Wrapper & Toggle Eye */
+        .password-wrapper { position: relative; width: 100%; margin-bottom: 15px; }
+        .password-wrapper input { padding-right: 40px; margin-bottom: 0; }
+        .toggle-password { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #94a3b8; user-select: none; font-size: 1.1rem; }
+        .toggle-password:hover { color: var(--primary); }
 
         .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
         .tab-btn { padding: 10px 20px; border-radius: 8px; cursor: pointer; background: #e2e8f0; border: none; font-weight: 600; }
@@ -53,7 +68,6 @@
         .total-stock-table th { background-color: #f1f5f9; color: var(--text-main); font-weight: 600; }
         .total-stock-table tr:hover { background-color: #f8fafc; }
 
-        /* Status Koneksi di Pojok Kiri Bawah */
         .status-koneksi {
             position: fixed;
             bottom: 15px;
@@ -70,12 +84,7 @@
             z-index: 9999;
             transition: all 0.3s ease;
         }
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-        }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
         .status-online { background: #d1fae5; color: #065f46; border: 1px solid #10b981; }
         .status-online .status-dot { background: #10b981; }
         .status-offline { background: #fee2e2; color: #991b1b; border: 1px solid #ef4444; }
@@ -85,14 +94,7 @@
         @media print {
             @page { size: auto; margin: 15mm; } 
             body > *:not(#print-sheet) { display: none !important; }
-            #print-sheet { 
-                display: block !important; 
-                width: 98% !important;
-                margin: 0 auto !important;
-                padding: 0 10px !important;
-                box-sizing: border-box;
-                color: black; 
-            }
+            #print-sheet { display: block !important; width: 98% !important; margin: 0 auto !important; padding: 0 10px !important; box-sizing: border-box; color: black; }
             #print-sheet table { display: table !important; width: 100% !important; border-collapse: collapse !important; }
             #print-sheet tr { display: table-row !important; }
             #print-sheet td, #print-sheet th { display: table-cell !important; }
@@ -110,65 +112,40 @@
     <span id="statusText">Online</span>
 </div>
 
-<!-- Modal Ambil Barang -->
-<div id="ambilModal" class="modal">
-    <div class="modal-content">
-        <h3>📥 Ambil Barang</h3>
-        <input type="number" id="qtyAmbil" value="1" placeholder="Jumlah" style="margin-bottom: 10px;">
-        <select id="unitAmbil" style="margin-bottom: 10px;"></select>
-        <input type="text" id="operatorAmbilModal" placeholder="Nama Operator" style="margin-bottom: 15px; background: #f1f5f9;" readonly>
-        <div style="display: flex; gap: 10px;">
-            <button onclick="prosesAmbil()" style="background:#10b981; flex:1;">Ambil</button>
-            <button onclick="closeModal('ambilModal')" style="background:#64748b; flex:1;">Batal</button>
+<!-- ================= INTERFACE LOGIN ================= -->
+<div id="loginScreen" class="login-screen">
+    <div class="login-card">
+        <h2>🔑 Login Sistem</h2>
+        <label for="loginRole">Kategori User / Role:</label>
+        <select id="loginRole">
+            <option value="admin">Admin</option>
+            <option value="gudang">User Gudang</option>
+            <option value="permintaan">User Permintaan</option>
+        </select>
+        
+        <label for="loginPassword">Password:</label>
+        <div class="password-wrapper">
+            <input type="password" id="loginPassword" placeholder="Masukkan password...">
+            <span class="toggle-password" onclick="togglePasswordVisibility('loginPassword', this)">👁️</span>
         </div>
+        
+        <button onclick="prosesLogin()">Masuk Aplikasi</button>
+        <p id="loginError" style="color: var(--danger); font-size: 0.85rem; font-weight: bold; margin-top: 10px; text-align: center; display: none;">Password salah!</p>
     </div>
 </div>
 
-<!-- Modal Edit Data -->
-<div id="editModal" class="modal">
-    <div class="modal-content">
-        <h3>✏️ Edit Data Barang</h3>
-        <input type="text" id="editNama" placeholder="Nama Barang" style="margin-bottom: 10px;">
-        <input type="text" id="editKode" placeholder="Kode Barang" style="margin-bottom: 10px;">
-        <input type="number" id="editQty" placeholder="Jumlah Awal" style="margin-bottom: 10px;">
-        <select id="editUnit" style="margin-bottom: 10px;"></select>
-        <input type="number" id="editIsi" placeholder="Isi per Satuan" style="margin-bottom: 10px;">
-        <select id="editRack" onchange="updateEditPalletDropdown()" style="margin-bottom: 10px;"></select>
-        <select id="editPallet" style="margin-bottom: 15px;"></select>
-        <div style="display: flex; gap: 10px;">
-            <button onclick="saveEdit()" style="background:#3b82f6; flex:1;">Simpan</button>
-            <button onclick="closeModal('editModal')" style="background:#64748b; flex:1;">Batal</button>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Pindah Pallet/Rak -->
-<div id="pindahModal" class="modal">
-    <div class="modal-content">
-        <h3>🚚 Pindah Lokasi Barang</h3>
-        <p id="pindahBarangInfo" style="font-weight: 600; font-size: 0.95rem; color: #4f46e5; margin-bottom: 15px;"></p>
-        <label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Rak Tujuan:</label>
-        <select id="pindahRack" onchange="updatePindahPalletDropdown()" style="margin-bottom: 15px; margin-top: 5px;"></select>
-        <label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Pallet Tujuan:</label>
-        <select id="pindahPallet" style="margin-bottom: 20px; margin-top: 5px;"></select>
-        <div style="display: flex; gap: 10px;">
-            <button onclick="prosesPindah()" style="background:#10b981; flex:1;">Pindahkan</button>
-            <button onclick="closeModal('pindahModal')" style="background:#64748b; flex:1;">Batal</button>
-        </div>
-    </div>
-</div>
-
-<div class="container">
+<!-- ================= INTERFACE UTAMA APLIKASI ================= -->
+<div id="mainApp" class="container" style="display: none;">
     <header class="header-frame">
         <h1>Gudang Inventory</h1>
-        <!-- Fitur Waktu dan Tanggal Real-Time -->
         <div class="header-datetime" id="realtimeClock">Memuat waktu...</div>
+        <button class="btn-logout" onclick="prosesLogout()">🔒 Logout</button>
     </header>
     
-    <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('gudang', this)">📦 Stok Gudang</button>
+    <div class="tabs" id="mainTabs">
+        <button class="tab-btn active" id="tabBtnGudang" onclick="switchTab('gudang', this)">📦 Stok Gudang</button>
         <button class="tab-btn" id="tabBtnPermintaan" onclick="switchTab('permintaan', this)">📝 Permintaan</button>
-        <button class="tab-btn" onclick="switchTab('riwayat', this)">📜 Riwayat Keluar</button>
+        <button class="tab-btn" id="tabBtnRiwayat" onclick="switchTab('riwayat', this)">📜 Riwayat Keluar</button>
     </div>
 
     <!-- Tab Stok Gudang -->
@@ -182,9 +159,8 @@
                 <input type="text" id="operatorInput" placeholder="👤 Operator..." onchange="saveOperator(this.value)">
             </div>
         </div>
-        <div class="card">
-            <h3>➕ Input Barang ke Pallet</h3>
-            <div class="grid-input">
+        <div class="card" id="formInputBarangCard">
+            <div class="grid-input" style="margin-top: 0;">
                 <input id="inputNamaBarang" placeholder="Nama Barang">
                 <input id="inputKodeBarang" placeholder="Kode Barang">
                 <input id="inputQty" type="number" placeholder="Jumlah Awal Satuan">
@@ -196,10 +172,10 @@
             <button onclick="simpanBarang()" style="margin-top: 15px; width: 100%;">💾 Simpan ke Inventory</button>
         </div>
         
-        <div class="card">
+        <div class="card" id="formConfigCard">
             <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                <button onclick="toggleForm('rackForm')" style="width: auto; background: #10b981;">➕ Tambah Rak Baru</button>
-                <button onclick="toggleForm('unitForm')" style="width: auto; background: #f59e0b;">🏷️ Tambah Satuan Baru</button>
+                <button id="btnTambahRak" onclick="toggleForm('rackForm')" style="width: auto; background: #10b981;">➕ Tambah Rak Baru</button>
+                <button id="btnTambahSatuan" onclick="toggleForm('unitForm')" style="width: auto; background: #f59e0b;">🏷️ Tambah Satuan Baru</button>
                 <button onclick="exportStokExcel()" style="width: auto; background: #8b5cf6;">🟢 Export Excel Stok</button>
             </div>
             
@@ -236,7 +212,7 @@
         <div class="card">
             <h3>📝 Buat Permintaan Barang</h3>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
-                <input id="reqNamaPeminta" placeholder="Nama Peminta">
+                <input id="reqNamaPeminta" placeholder="Nama">
                 <input id="reqDepartemen" placeholder="Departemen (Contoh: Produksi, QA, HRD)">
             </div>
             <div class="grid-input">
@@ -255,7 +231,7 @@
                 <h3>📋 Daftar Permintaan Terkirim</h3>
                 <button onclick="exportPermintaanExcel()" style="background: #10b981; width: auto; padding: 8px 15px;">🟢 Export Excel</button>
             </div>
-            <input type="text" id="searchPermintaan" placeholder="🔍 Cari peminta/departemen/barang..." oninput="renderAll()" style="margin-bottom: 10px;">
+            <input type="text" id="searchPermintaan" placeholder="🔍 Cari nama/departemen/barang..." oninput="renderAll()" style="margin-bottom: 10px;">
             <div id="permintaanContainer"></div>
         </div>
     </div>
@@ -267,14 +243,28 @@
                 <h3>📜 Semua Riwayat Keluar</h3>
                 <button onclick="exportRiwayatExcel()" style="background: #10b981; width: auto; padding: 8px 15px;">🟢 Export Excel</button>
             </div>
-            <input type="text" id="searchRiwayat" placeholder="🔍 Cari riwayat (Barang/Operator)..." oninput="renderAll()" style="margin-5px;">
+            <input type="text" id="searchRiwayat" placeholder="🔍 Cari riwayat (Barang/Operator)..." oninput="renderAll()" style="margin: 5px;">
             <div id="riwayatContainer"></div>
-            <button onclick="bersihkanRiwayat()" style="background:#ef4444; margin-top:20px; width: auto;">🗑️ Hapus Semua Riwayat</button>
+            <button id="btnHapusSemuaRiwayat" onclick="bersihkanRiwayat()" style="background:#ef4444; margin-top:20px; width: auto;">🗑️ Hapus Semua Riwayat</button>
         </div>
     </div>
 </div>
 
+<!-- Modal Modifikasi Data -->
+<div id="ambilModal" class="modal"><div class="modal-content"><h3>📥 Ambil Barang</h3><input type="number" id="qtyAmbil" value="1" placeholder="Jumlah" style="margin-bottom: 10px;"><select id="unitAmbil" style="margin-bottom: 10px;"></select><input type="text" id="operatorAmbilModal" placeholder="Nama Operator" style="margin-bottom: 15px; background: #f1f5f9;" readonly><div style="display: flex; gap: 10px;"><button onclick="prosesAmbil()" style="background:#10b981; flex:1;">Ambil</button><button onclick="closeModal('ambilModal')" style="background:#64748b; flex:1;">Batal</button></div></div></div>
+<div id="editModal" class="modal"><div class="modal-content"><h3>✏️ Edit Data Barang</h3><input type="text" id="editNama" placeholder="Nama Barang" style="margin-bottom: 10px;"><input type="text" id="editKode" placeholder="Kode Barang" style="margin-bottom: 10px;"><input type="number" id="editQty" placeholder="Jumlah Awal" style="margin-bottom: 10px;"><select id="editUnit" style="margin-bottom: 10px;"></select><input type="number" id="editIsi" placeholder="Isi per Satuan" style="margin-bottom: 10px;"><select id="editRack" onchange="updateEditPalletDropdown()" style="margin-bottom: 10px;"></select><select id="editPallet" style="margin-bottom: 15px;"></select><div style="display: flex; gap: 10px;"><button onclick="saveEdit()" style="background:#3b82f6; flex:1;">Simpan</button><button onclick="closeModal('editModal')" style="background:#64748b; flex:1;">Batal</button></div></div></div>
+<div id="pindahModal" class="modal"><div class="modal-content"><h3>🚚 Pindah Lokasi Barang</h3><p id="pindahBarangInfo" style="font-weight: 600; font-size: 0.95rem; color: #4f46e5; margin-bottom: 15px;"></p><label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Rak Tujuan:</label><select id="pindahRack" onchange="updatePindahPalletDropdown()" style="margin-bottom: 15px; margin-top: 5px;"></select><label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Pallet Tujuan:</label><select id="pindahPallet" style="margin-bottom: 20px; margin-top: 5px;"></select><div style="display: flex; gap: 10px;"><button onclick="prosesPindah()" style="background:#10b981; flex:1;">Pindahkan</button><button onclick="closeModal('pindahModal')" style="background:#64748b; flex:1;">Batal</button></div></div></div>
+
 <script>
+    // Konfigurasi Kredensial Akses Aplikasi
+    const ROLE_PASSWORDS = {
+        admin: "admin123",
+        gudang: "gudang123",
+        permintaan: "minta123"
+    };
+
+    let currentUserRole = sessionStorage.getItem('gudang_role') || null;
+
     let defaultRacks = [ { name: "Rak A", palletCount: 5 }, { name: "Rak B", palletCount: 5 } ];
     let racks = JSON.parse(localStorage.getItem('gudang_racks'));
     if (!racks || racks.length === 0) { racks = defaultRacks; localStorage.setItem('gudang_racks', JSON.stringify(racks)); }
@@ -288,39 +278,103 @@
     let permintaan = JSON.parse(localStorage.getItem('gudang_permintaan')) || [];
     let draftItems = [];
     let currentIdx = null;
-
     let palletPages = {};
 
     document.getElementById('operatorInput').value = localStorage.getItem('gudang_operator') || '';
     function saveOperator(val) { localStorage.setItem('gudang_operator', val); }
 
-    // Fitur Jam dan Tanggal Real-Time
     function updateClock() {
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         const now = new Date();
-        const dateStr = now.toLocaleDateString('id-ID', options);
-        const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        
-        document.getElementById('realtimeClock').innerHTML = `📅 ${dateStr} &nbsp;|&nbsp; ⏰ ${timeStr}`;
+        document.getElementById('realtimeClock').innerHTML = `📅 ${now.toLocaleDateString('id-ID', options)} &nbsp;|&nbsp; ⏰ ${now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
     }
-    setInterval(updateClock, 1000);
-    updateClock();
+    setInterval(updateClock, 1000); updateClock();
 
-    // Fitur Deteksi Koneksi Online / Offline
     function updateConnectionStatus() {
         const el = document.getElementById('connectionStatus');
         const text = document.getElementById('statusText');
-        if (navigator.onLine) {
-            el.className = 'status-koneksi status-online';
-            text.innerText = 'Online';
+        if (navigator.onLine) { el.className = 'status-koneksi status-online'; text.innerText = 'Online'; } 
+        else { el.className = 'status-koneksi status-offline'; text.innerText = 'Offline'; }
+    }
+    window.addEventListener('online', updateConnectionStatus); window.addEventListener('offline', updateConnectionStatus); updateConnectionStatus();
+
+    // Fungsi Toggle Visibilitas Password
+    function togglePasswordVisibility(inputId, iconEl) {
+        const passwordInput = document.getElementById(inputId);
+        if (passwordInput.type === "password") {
+            passwordInput.type = "text";
+            iconEl.innerText = "🙈";
         } else {
-            el.className = 'status-koneksi status-offline';
-            text.innerText = 'Offline';
+            passwordInput.type = "password";
+            iconEl.innerText = "👁️";
         }
     }
-    window.addEventListener('online', updateConnectionStatus);
-    window.addEventListener('offline', updateConnectionStatus);
-    updateConnectionStatus(); // Inisialisasi awal
+
+    // ================= SINKRONISASI MANAJEMEN ROLE & AKSES TAB =================
+    function cekSessionLogin() {
+        if (currentUserRole) {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            
+            const selectedFilter = document.getElementById('filterRack').value;
+            document.getElementById('filterRack').innerHTML = '<option value="">📁 Semua Rak...</option>' + racks.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
+            document.getElementById('filterRack').value = selectedFilter;
+
+            if (currentUserRole === 'admin') {
+                document.getElementById('tabBtnGudang').style.display = 'block';
+                document.getElementById('tabBtnPermintaan').style.display = 'block';
+                document.getElementById('tabBtnRiwayat').style.display = 'block';
+                document.getElementById('formInputBarangCard').style.display = 'block';
+                document.getElementById('formConfigCard').style.display = 'block';
+                document.getElementById('btnHapusSemuaRiwayat').style.display = 'block';
+                switchTab('gudang', document.getElementById('tabBtnGudang'));
+            } else if (currentUserRole === 'gudang') {
+                document.getElementById('tabBtnGudang').style.display = 'block';
+                document.getElementById('tabBtnPermintaan').style.display = 'block';
+                document.getElementById('tabBtnRiwayat').style.display = 'block';
+                document.getElementById('formInputBarangCard').style.display = 'block';
+                document.getElementById('formConfigCard').style.display = 'block';
+                document.getElementById('btnHapusSemuaRiwayat').style.display = 'none';
+                switchTab('gudang', document.getElementById('tabBtnGudang'));
+            } else if (currentUserRole === 'permintaan') {
+                document.getElementById('tabBtnGudang').style.display = 'none';
+                document.getElementById('tabBtnRiwayat').style.display = 'none';
+                document.getElementById('tabBtnPermintaan').style.display = 'block';
+                switchTab('permintaan', document.getElementById('tabBtnPermintaan'));
+            }
+            renderAll();
+        } else {
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('mainApp').style.display = 'none';
+            // Reset visibility password saat log out
+            const loginPass = document.getElementById('loginPassword');
+            loginPass.type = "password";
+            const eyeIcon = loginPass.nextElementSibling;
+            if (eyeIcon) eyeIcon.innerText = "👁️";
+        }
+    }
+
+    function prosesLogin() {
+        const role = document.getElementById('loginRole').value;
+        const pass = document.getElementById('loginPassword').value;
+        const errEl = document.getElementById('loginError');
+
+        if (pass === ROLE_PASSWORDS[role]) {
+            errEl.style.display = 'none';
+            currentUserRole = role;
+            sessionStorage.setItem('gudang_role', role);
+            document.getElementById('loginPassword').value = '';
+            cekSessionLogin();
+        } else {
+            errEl.style.display = 'block';
+        }
+    }
+
+    function prosesLogout() {
+        currentUserRole = null;
+        sessionStorage.removeItem('gudang_role');
+        cekSessionLogin();
+    }
 
     function switchTab(id, btn) {
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -335,15 +389,8 @@
         f.style.display = (f.style.display === 'none') ? 'block' : 'none'; 
     }
 
-    function resetPageAndRender() {
-        palletPages = {};
-        renderAll();
-    }
-
-    function setPalletPage(rackName, palletName, pageNum) {
-        palletPages[`${rackName}-${palletName}`] = pageNum;
-        renderAll();
-    }
+    function resetPageAndRender() { palletPages = {}; renderAll(); }
+    function setPalletPage(rackName, palletName, pageNum) { palletPages[`${rackName}-${palletName}`] = pageNum; renderAll(); }
 
     function tambahPalletKeRak(rackName) {
         const rack = racks.find(r => r.name === rackName);
@@ -363,6 +410,11 @@
         localStorage.setItem('gudang_racks', JSON.stringify(racks));
         document.getElementById('inputNamaRak').value = '';
         document.getElementById('inputJmlPallet').value = '';
+        
+        const currentFilter = document.getElementById('filterRack').value;
+        document.getElementById('filterRack').innerHTML = '<option value="">📁 Semua Rak...</option>' + racks.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
+        document.getElementById('filterRack').value = currentFilter;
+
         toggleForm('rackForm');
         renderAll();
     }
@@ -370,12 +422,9 @@
     function simpanSatuanBaru() {
         let satuanBaru = document.getElementById('inputSatuanBaru').value.trim();
         if(!satuanBaru) return alert("Nama satuan tidak boleh kosong!");
-        
         let exists = customUnits.some(u => u.toLowerCase() === satuanBaru.toLowerCase());
         if(exists) return alert("Satuan tersebut sudah terdaftar!");
-
         satuanBaru = satuanBaru.charAt(0).toUpperCase() + satuanBaru.slice(1);
-        
         customUnits.push(satuanBaru);
         localStorage.setItem('gudang_units', JSON.stringify(customUnits));
         document.getElementById('inputSatuanBaru').value = '';
@@ -413,11 +462,7 @@
         const palletSelect = document.getElementById('pindahPallet');
         palletSelect.innerHTML = '';
         const rack = racks.find(r => r.name === rackName);
-        if(rack) { 
-            for(let i = 1; i <= rack.palletCount; i++) { 
-                palletSelect.innerHTML += `<option value="Pallet ${i}">Pallet ${i}</option>`; 
-            } 
-        }
+        if(rack) { for(let i = 1; i <= rack.palletCount; i++) { palletSelect.innerHTML += `<option value="Pallet ${i}">Pallet ${i}</option>`; } }
     }
 
     function addToDraft() {
@@ -425,11 +470,9 @@
         const qty = parseInt(document.getElementById('reqQty').value);
         const unit = document.getElementById('reqUnit').value;
         if(!itemName || !qty || !unit) return alert("Pilih barang, isi jumlah, dan satuan!");
-        
         const itemInStok = stok.find(s => s.item === itemName);
         const isi = itemInStok ? itemInStok.isiPerUnit : 1;
         const totalPcs = qty * (unit.toLowerCase() !== 'pcs' ? isi : 1);
-
         draftItems.push({ item: itemName, qty, unit, totalPcs });
         renderDraft();
         document.getElementById('reqNamaBarang').value = '';
@@ -451,41 +494,29 @@
     function kirimPermintaan() {
         const peminta = document.getElementById('reqNamaPeminta').value;
         const departemen = document.getElementById('reqDepartemen').value || "-";
-        if(!peminta) return alert("Isi Nama Peminta terlebih dahulu!");
-        
-        permintaan.push({ 
-            peminta, 
-            departemen, 
-            items: draftItems, 
-            tanggal: new Date().toLocaleDateString(), 
-            status: 'pending', 
-            operator: '' 
-        });
-        
+        if(!peminta) return alert("Isi Nama terlebih dahulu!");
+        permintaan.push({ peminta, departemen, items: draftItems, tanggal: new Date().toLocaleDateString('id-ID'), status: 'pending', operator: '' });
         localStorage.setItem('gudang_permintaan', JSON.stringify(permintaan));
         draftItems = [];
         document.getElementById('reqNamaPeminta').value = '';
         document.getElementById('reqDepartemen').value = '';
-        renderDraft();
-        renderAll();
+        renderDraft(); renderAll();
         alert("Permintaan berhasil dikirim!");
     }
 
     function selesaikanPermintaan(idx) {
         let op = localStorage.getItem('gudang_operator');
-        if(!op || op.trim() === "") {
-            return alert("Wajib mengisi 'Nama Operator' di bagian atas halaman sebelum menyelesaikan permintaan!");
-        }
-        
+        if(currentUserRole !== 'admin' && currentUserRole !== 'gudang') { return alert("Anda tidak memiliki hak akses untuk menyelesaikan permintaan."); }
+        if(!op || op.trim() === "") { return alert("Wajib mengisi 'Nama Operator' di bagian atas halaman sebelum menyelesaikan permintaan!"); }
         permintaan[idx].status = 'done';
         permintaan[idx].operator = op; 
-        
         localStorage.setItem('gudang_permintaan', JSON.stringify(permintaan));
         renderAll();
         alert(`Permintaan diselesaikan oleh: ${op}`);
     }
 
     function hapusPermintaan(idx) {
+        if(currentUserRole !== 'admin') return alert("Hanya admin yang dapat menghapus data permintaan terkirim!");
         if(confirm("Apakah Anda yakin ingin menghapus permintaan ini dari daftar?")) {
             permintaan.splice(idx, 1);
             localStorage.setItem('gudang_permintaan', JSON.stringify(permintaan));
@@ -496,124 +527,34 @@
     function cetakForm(idx) {
         const p = permintaan[idx];
         const namaPemberi1 = p.status === 'done' ? p.operator : '-';
-        const departemenName = p.departemen || '-';
         const pSheet = document.getElementById('print-sheet');
         pSheet.innerHTML = `
-            <div style="text-align: center; margin-bottom: 30px;">
-                <h2 style="margin:0; text-transform: uppercase;">FORM PERMINTAAN BARANG</h2>
-            </div>
+            <div style="text-align: center; margin-bottom: 30px;"><h2 style="margin:0; text-transform: uppercase;">FORM PERMINTAAN BARANG</h2></div>
             <table style="width: 100%; border: 1px solid #000; border-collapse: collapse; margin-bottom: 30px;">
-                <tr>
-                    <td style="border: 1px solid #000; padding: 10px; width: 50%;"><strong>Nama Peminta :</strong> ${p.peminta}</td>
-                    <td style="border: 1px solid #000; padding: 10px; width: 50%;"><strong>Departemen :</strong> ${departemenName}</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid #000; padding: 10px; width: 50%;"><strong>Tanggal :</strong> ${p.tanggal}</td>
-                    <td style="border: 1px solid #000; padding: 10px; width: 50%;"><strong>Status Permintaan :</strong> ${p.status.toUpperCase()}</td>
-                </tr>
+                <tr><td style="border: 1px solid #000; padding: 10px; width: 50%;"><strong>Nama :</strong> ${p.peminta}</td><td style="border: 1px solid #000; padding: 10px; width: 50%;"><strong>Departemen :</strong> ${p.departemen || '-'}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 10px; width: 50%;"><strong>Tanggal :</strong> ${p.tanggal}</td><td style="border: 1px solid #000; padding: 10px; width: 50%;"><strong>Status Permintaan :</strong> ${p.status.toUpperCase()}</td></tr>
             </table>
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
-                <thead>
-                    <tr style="background: #333; color: white;">
-                        <th style="border: 1px solid #000; padding: 8px; width: 5%;">No</th>
-                        <th style="border: 1px solid #000; padding: 8px; text-align: left;">Nama Barang</th>
-                        <th style="border: 1px solid #000; padding: 8px;">Jumlah</th>
-                        <th style="border: 1px solid #000; padding: 8px;">Satuan</th>
-                        <th style="border: 1px solid #000; padding: 8px;">Total Pcs</th>
-                        <th style="border: 1px solid #000; padding: 8px; width: 25%;">Pemberi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${p.items.map((item, i) => `
-                        <tr>
-                            <td style="border: 1px solid #000; padding: 8px; text-align:center;">${i+1}</td>
-                            <td style="border: 1px solid #000; padding: 8px;">${item.item}</td>
-                            <td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.qty}</td>
-                            <td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.unit}</td>
-                            <td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.totalPcs}</td>
-                            <td style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold; background: #fafafa;">${namaPemberi1}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
+                <thead><tr style="background: #333; color: white;"><th style="border: 1px solid #000; padding: 8px;">No</th><th style="border: 1px solid #000; padding: 8px;">Nama Barang</th><th style="border: 1px solid #000; padding: 8px;">Jumlah</th><th style="border: 1px solid #000; padding: 8px;">Satuan</th><th style="border: 1px solid #000; padding: 8px;">Total Pcs</th><th style="border: 1px solid #000; padding: 8px; width: 25%;">Pemberi</th></tr></thead>
+                <tbody>${p.items.map((item, i) => `<tr><td style="border: 1px solid #000; padding: 8px; text-align:center;">${i+1}</td><td style="border: 1px solid #000; padding: 8px;">${item.item}</td><td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.qty}</td><td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.unit}</td><td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.totalPcs}</td><td style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">${namaPemberi1}</td></tr>`).join('')}</tbody>
             </table>
-            
-            <div style="display: flex; justify-content: flex-end; text-align: center; margin-top: 50px; padding-right: 50px;">
-                <div style="width: 200px;">
-                    Peminta,<br><br><br><br><br>
-                    ( <b>${p.peminta}</b> )
-                </div>
-            </div>
         `;
         window.print();
     }
 
     function cetakSemuaUserHariIni(nama) {
-        const today = new Date().toLocaleDateString();
+        const today = new Date().toLocaleDateString('id-ID');
         const userReqs = permintaan.filter(p => p.peminta === nama && p.tanggal === today);
-        
-        if (userReqs.length === 0) return alert("Tidak ada permintaan untuk user ini hari ini.");
-
+        if (userReqs.length === 0) return alert("Tidak ada permintaan untuk nama ini hari ini.");
         let allItems = [];
-        let depts = [...new Set(userReqs.map(p => p.departemen || "-"))].join(', ');
-        
-        userReqs.forEach(p => { 
-            p.items.forEach(item => {
-                allItems.push({
-                    ...item,
-                    operator: p.status === 'done' ? p.operator : '-'
-                });
-            });
-        });
-
+        userReqs.forEach(p => { p.items.forEach(item => { allItems.push({ ...item, operator: p.status === 'done' ? p.operator : '-' }); }); });
         const pSheet = document.getElementById('print-sheet');
-        pSheet.innerHTML = `
-            <div style="text-align: center; margin-bottom: 20px;"><h2>REKAP PERMINTAAN HARIAN</h2></div>
-            <table style="width: 100%; border: 1px solid #000; border-collapse: collapse; margin-bottom: 20px;">
-                <tr>
-                    <td style="border: 1px solid #000; padding: 10px;"><strong>Nama Peminta:</strong> ${nama}</td>
-                    <td style="border: 1px solid #000; padding: 10px;"><strong>Departemen:</strong> ${depts}</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid #000; padding: 10px;" colspan="2"><strong>Tanggal:</strong> ${today}</td>
-                </tr>
-            </table>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
-                <thead>
-                    <tr style="background: #333; color: white;">
-                        <th style="border: 1px solid #000; padding: 8px;">No</th>
-                        <th style="border: 1px solid #000; padding: 8px;">Nama Barang</th>
-                        <th style="border: 1px solid #000; padding: 8px;">Jumlah</th>
-                        <th style="border: 1px solid #000; padding: 8px;">Satuan</th>
-                        <th style="border: 1px solid #000; padding: 8px;">Total Pcs</th>
-                        <th style="border: 1px solid #000; padding: 8px; width: 25%;">Pemberi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${allItems.map((item, i) => `
-                        <tr>
-                            <td style="border: 1px solid #000; padding: 8px; text-align:center;">${i+1}</td>
-                            <td style="border: 1px solid #000; padding: 8px;">${item.item}</td>
-                            <td style="border: 1px solid #000; padding: 8px; text-align:center;">${item.qty}</td>
-                            <td style="border: 1px solid #000; padding: 8px; text-align:center;">${item.unit}</td>
-                            <td style="border: 1px solid #000; padding: 8px; text-align:center;">${item.totalPcs}</td>
-                            <td style="border: 1px solid #000; padding: 8px; text-align:center; font-weight: bold; background: #fafafa;">${item.operator}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-            
-            <div style="display: flex; justify-content: flex-end; text-align: center; margin-top: 50px; padding-right: 50px;">
-                <div style="width: 200px;">
-                    Peminta,<br><br><br><br><br>
-                    ( <b>${nama}</b> )
-                </div>
-            </div>
-        `;
-
-        setTimeout(() => {
-            window.print();
-            setTimeout(() => { pSheet.innerHTML = ''; }, 1000);
-        }, 500);
+        pSheet.innerHTML = `<h2>REKAP PERMINTAAN HARIAN</h2><p>Nama: ${nama} | Tanggal: ${today}</p>
+            <table style="width:100%; border-collapse:collapse;">
+                <thead><tr style="background:#333; color:white;"><th>No</th><th>Barang</th><th>Jumlah</th><th>Satuan</th><th>Total Pcs</th><th>Pemberi</th></tr></thead>
+                <tbody>${allItems.map((item, i) => `<tr><td>${i+1}</td><td>${item.item}</td><td>${item.qty}</td><td>${item.unit}</td><td>${item.totalPcs}</td><td>${item.operator}</td></tr>`).join('')}</tbody>
+            </table>`;
+        window.print();
     }
 
     function simpanBarang() {
@@ -630,11 +571,7 @@
         let multiplier = (unit.toLowerCase() !== 'pcs') ? isi : 1;
         stok.push({ item, code, qty, unit, isiPerUnit: isi, totalPcs: qty * multiplier, rack, pallet });
         localStorage.setItem('gudang_stok', JSON.stringify(stok));
-        document.getElementById('inputNamaBarang').value = '';
-        document.getElementById('inputKodeBarang').value = '';
-        document.getElementById('inputQty').value = '';
-        document.getElementById('unit').value = '';
-        document.getElementById('inputIsi').value = '';
+        document.getElementById('inputNamaBarang').value = ''; document.getElementById('inputKodeBarang').value = ''; document.getElementById('inputQty').value = '';
         renderAll();
     }
     
@@ -642,328 +579,190 @@
     function openAmbilModal(idx) { currentIdx = idx; document.getElementById('ambilModal').style.display = 'flex'; document.getElementById('operatorAmbilModal').value = localStorage.getItem('gudang_operator') || ''; }
     
     function openEditModal(idx) {
-        currentIdx = idx;
-        let item = stok[idx];
-        document.getElementById('editNama').value = item.item;
-        document.getElementById('editKode').value = item.code || ''; 
-        document.getElementById('editQty').value = item.qty;
-        document.getElementById('editUnit').value = item.unit;
-        document.getElementById('editIsi').value = item.isiPerUnit;
-        const editRack = document.getElementById('editRack');
-        editRack.innerHTML = racks.map(r => `<option value="${r.name}" ${r.name === item.rack ? 'selected' : ''}>${r.name}</option>`).join('');
-        updateEditPalletDropdown();
-        document.getElementById('editPallet').value = item.pallet;
+        currentIdx = idx; let item = stok[idx];
+        document.getElementById('editNama').value = item.item; document.getElementById('editKode').value = item.code || ''; 
+        document.getElementById('editQty').value = item.qty; document.getElementById('editUnit').value = item.unit; document.getElementById('editIsi').value = item.isiPerUnit;
+        document.getElementById('editRack').innerHTML = racks.map(r => `<option value="${r.name}" ${r.name === item.rack ? 'selected' : ''}>${r.name}</option>`).join('');
+        updateEditPalletDropdown(); document.getElementById('editPallet').value = item.pallet;
         document.getElementById('editModal').style.display = 'flex';
     }
 
     function saveEdit() {
         let item = stok[currentIdx];
-        item.item = document.getElementById('editNama').value;
-        item.code = document.getElementById('editKode').value;
-        item.qty = parseInt(document.getElementById('editQty').value);
-        item.unit = document.getElementById('editUnit').value;
-        item.isiPerUnit = parseInt(document.getElementById('editIsi').value) || 1;
-        item.rack = document.getElementById('editRack').value;
-        item.pallet = document.getElementById('editPallet').value;
-        let multiplier = (item.unit.toLowerCase() !== 'pcs') ? item.isiPerUnit : 1;
-        item.totalPcs = item.qty * multiplier;
+        item.item = document.getElementById('editNama').value; item.code = document.getElementById('editKode').value;
+        item.qty = parseInt(document.getElementById('editQty').value); item.unit = document.getElementById('editUnit').value;
+        item.isiPerUnit = parseInt(document.getElementById('editIsi').value) || 1; item.rack = document.getElementById('editRack').value; item.pallet = document.getElementById('editPallet').value;
+        item.totalPcs = item.qty * ((item.unit.toLowerCase() !== 'pcs') ? item.isiPerUnit : 1);
         localStorage.setItem('gudang_stok', JSON.stringify(stok));
-        renderAll();
-        closeModal('editModal');
+        renderAll(); closeModal('editModal');
     }
 
     function openPindahModal(idx) {
-        currentIdx = idx;
-        let item = stok[idx];
-        
+        currentIdx = idx; let item = stok[idx];
         document.getElementById('pindahBarangInfo').innerText = `${item.item} (Asal: ${item.rack} - ${item.pallet})`;
-        
-        const pindahRack = document.getElementById('pindahRack');
-        pindahRack.innerHTML = racks.map(r => `<option value="${r.name}" ${r.name === item.rack ? 'selected' : ''}>${r.name}</option>`).join('');
-        
-        updatePindahPalletDropdown();
-        document.getElementById('pindahPallet').value = item.pallet;
-        
+        document.getElementById('pindahRack').innerHTML = racks.map(r => `<option value="${r.name}" ${r.name === item.rack ? 'selected' : ''}>${r.name}</option>`).join('');
+        updatePindahPalletDropdown(); document.getElementById('pindahPallet').value = item.pallet;
         document.getElementById('pindahModal').style.display = 'flex';
     }
 
     function prosesPindah() {
         let item = stok[currentIdx];
-        const rackBaru = document.getElementById('pindahRack').value;
-        const palletBaru = document.getElementById('pindahPallet').value;
-        
-        if (!rackBaru || !palletBaru) {
-            return alert("Silakan pilih rak dan pallet tujuan!");
-        }
-
-        item.rack = rackBaru;
-        item.pallet = palletBaru;
-        
+        item.rack = document.getElementById('pindahRack').value; item.pallet = document.getElementById('pindahPallet').value;
         localStorage.setItem('gudang_stok', JSON.stringify(stok));
-        alert(`Berhasil memindahkan barang ke ${rackBaru} - ${palletBaru}`);
-        
-        closeModal('pindahModal');
-        renderAll();
+        closeModal('pindahModal'); renderAll();
     }
     
     function prosesAmbil() {
         let operator = document.getElementById('operatorAmbilModal').value;
         if(!operator || operator.trim() === "") return alert("Nama Operator wajib diisi!");
-        
         let ambil = parseInt(document.getElementById('qtyAmbil').value);
         let unit = document.getElementById('unitAmbil').value;
-        if(isNaN(ambil) || !unit) return alert("Isi jumlah dan satuan pengambilan!");
-        
         let item = stok[currentIdx];
-        let multiplier = (unit.toLowerCase() !== 'pcs') ? item.isiPerUnit : 1;
-        let totalAmbil = ambil * multiplier;
-        
-        if(totalAmbil <= 0) return alert("Jumlah tidak valid!");
-        if(totalAmbil > item.totalPcs) return alert("Stok di pallet tidak mencukupi!");
-        
-        riwayat.push({ item: item.item, jumlahDisplay: `${ambil} ${unit}`, jumlahPcs: totalAmbil, operator: operator, dari: `${item.rack} - ${item.pallet}`, tanggal: new Date().toLocaleString() });
+        let totalAmbil = ambil * ((unit.toLowerCase() !== 'pcs') ? item.isiPerUnit : 1);
+        if(totalAmbil > item.totalPcs) return alert("Stok tidak mencukupi!");
+        riwayat.push({ item: item.item, jumlahDisplay: `${ambil} ${unit}`, jumlahPcs: totalAmbil, operator: operator, dari: `${item.rack} - ${item.pallet}`, tanggal: new Date().toLocaleString('id-ID') });
         localStorage.setItem('gudang_riwayat', JSON.stringify(riwayat));
-        
-        item.totalPcs -= totalAmbil;
-        if (item.totalPcs <= 0) stok.splice(currentIdx, 1);
-        
+        item.totalPcs -= totalAmbil; if (item.totalPcs <= 0) stok.splice(currentIdx, 1);
         localStorage.setItem('gudang_stok', JSON.stringify(stok));
-        document.getElementById('qtyAmbil').value = '1';
-        document.getElementById('unitAmbil').value = '';
         renderAll(); closeModal('ambilModal');
     }
     
-    function hapusBarang(idx) { if(confirm("Apakah Anda yakin ingin menghapus item ini?")) { stok.splice(idx, 1); localStorage.setItem('gudang_stok', JSON.stringify(stok)); renderAll(); } }
-    function bersihkanRiwayat() { if(confirm("Hapus semua riwayat keluar?")) { riwayat = []; localStorage.setItem('gudang_riwayat', JSON.stringify(riwayat)); renderAll(); } }
+    function hapusBarang(idx) { 
+        if(currentUserRole !== 'admin') return alert("Hanya admin yang bisa menghapus item dari stok secara permanen!");
+        if(confirm("Apakah Anda yakin ingin menghapus item ini?")) { stok.splice(idx, 1); localStorage.setItem('gudang_stok', JSON.stringify(stok)); renderAll(); } 
+    }
+    function bersihkanRiwayat() { 
+        if(currentUserRole !== 'admin') return alert("Akses Ditolak! Anda tidak bisa menghapus riwayat keluar.");
+        if(confirm("Hapus semua riwayat keluar?")) { riwayat = []; localStorage.setItem('gudang_riwayat', JSON.stringify(riwayat)); renderAll(); } 
+    }
 
     function updateUnitForRequest() {
         const itemName = document.getElementById('reqNamaBarang').value;
         const itemInStok = stok.find(s => s.item === itemName);
-        if (itemInStok) {
-            document.getElementById('reqUnit').value = itemInStok.unit;
-        } else {
-            document.getElementById('reqUnit').value = '';
-        }
+        document.getElementById('reqUnit').value = itemInStok ? itemInStok.unit : '';
     }
 
+    // ================= FUNGSI UTAMA ENGINE RENDER INTERFACE =================
     function renderAll() {
-        let searchPerm = document.getElementById('searchPermintaan').value.toLowerCase();
-        let filteredPerm = permintaan.filter(p => 
-            p.peminta.toLowerCase().includes(searchPerm) || 
-            (p.departemen && p.departemen.toLowerCase().includes(searchPerm)) ||
-            p.items.some(i => i.item.toLowerCase().includes(searchPerm))
-        );
+        if (!currentUserRole) return;
         
+        let searchPerm = document.getElementById('searchPermintaan').value.toLowerCase();
+        let filteredPerm = permintaan.filter(p => p.peminta.toLowerCase().includes(searchPerm) || p.items.some(i => i.item.toLowerCase().includes(searchPerm)));
         let pending = permintaan.filter(p => p.status === 'pending').length;
         document.getElementById('tabBtnPermintaan').innerHTML = pending > 0 ? `📝 Permintaan <span style="background:#ef4444; color:white; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:bold;">${pending}</span>` : `📝 Permintaan`;
         
-        const reqSelect = document.getElementById('reqNamaBarang');
-        reqSelect.innerHTML = '<option value="">Pilih Barang dari Stok...</option>' + [...new Set(stok.map(s => s.item))].map(name => `<option value="${name}">${name}</option>`).join('');
+        document.getElementById('reqNamaBarang').innerHTML = '<option value="">Pilih Barang dari Stok...</option>' + [...new Set(stok.map(s => s.item))].map(name => `<option value="${name}">${name}</option>`).join('');
         
-        let pContainer = document.getElementById('permintaanContainer');
-        pContainer.innerHTML = '';
+        let pContainer = document.getElementById('permintaanContainer'); pContainer.innerHTML = '';
         let pemintas = [...new Set(filteredPerm.map(p => p.peminta))];
         
         pemintas.forEach(nama => {
             let userReqs = filteredPerm.filter(p => p.peminta === nama);
-            let userDepts = [...new Set(userReqs.map(p => p.departemen || "-"))].join(', ');
-            pContainer.innerHTML += `
-                <div style="font-weight:bold; margin-top:20px; color:#8b5cf6; border-bottom:2px solid #8b5cf6; padding-bottom:5px; display:flex; justify-content:space-between; align-items:center;">
-                    <span>👤 Peminta: ${nama} <span style="font-size:0.85rem; color:#64748b; font-weight:normal;">(${userDepts})</span></span>
-                    <button onclick="cetakSemuaUserHariIni('${nama}')" style="background:#6366f1; padding:4px 8px; font-size:11px; cursor:pointer; color:white; border:none; border-radius:4px;" class="no-print">🖨️ Cetak Semua Hari Ini</button>
-                </div>
-            `;
+            pContainer.innerHTML += `<div style="font-weight:bold; margin-top:20px; color:#8b5cf6; border-bottom:2px solid #8b5cf6; padding-bottom:5px; display:flex; justify-content:space-between; align-items:center;">
+                <span>👤 Nama: ${nama}</span><button onclick="cetakSemuaUserHariIni('${nama}')" style="background:#6366f1; padding:4px 8px; font-size:11px;" class="no-print">🖨️ Cetak Rekap</button></div>`;
             
             userReqs.forEach(p => {
                 let actualIdx = permintaan.indexOf(p);
                 let isDone = p.status === 'done';
-                let itemText = (p.items || []).map(i => `${i.item} (${i.qty} ${i.unit} / <b>${i.totalPcs} Pcs</b>)`).join(', ');
+                let actionBtnText = isDone ? '<span style="font-size:1.2rem;">✅</span>' : `<button onclick="selesaikanPermintaan(${actualIdx})" style="background:#10b981; width:auto; padding:6px 14px; font-size:12px;">✅ Selesai</button>`;
+                let deleteButtonHtml = currentUserRole === 'admin' ? `<button onclick="hapusPermintaan(${actualIdx})" style="background:#ef4444; width:auto; padding:6px 14px; font-size:12px;">❌</button>` : '';
+
                 pContainer.innerHTML += `
                     <div class="item-row" style="flex-direction:row; justify-content:space-between; align-items:center; background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:8px; border:1px solid #e2e8f0;">
-                        <span style="${isDone ? 'text-decoration: line-through; color: #94a3b8;' : ''}">
-                            <b>Peminta: ${p.peminta}</b> - <small style="color:#64748b;">(Tgl: ${p.tanggal})</small><br>
-                            Departemen: <span style="color:#059669; font-weight:600;">${p.departemen || '-'}</span><br>
-                            Permintaan: <span style="color:#8b5cf6; font-weight:600;">${itemText}</span>
-                            ${isDone ? `<br><small style="color:#64748b;">Diserahkan oleh: <b>${p.operator}</b></small>` : ''}
+                        <span>
+                            <b>Departemen: ${p.departemen}</b><br>
+                            Permintaan: ${p.items.map(i=>i.item+' ('+i.qty+' '+i.unit+')').join(', ')}<br>
+                            <small style="color:#64748b;">📅 Tanggal: ${p.tanggal || '-'}</small>
                         </span>
                         <div style="display:flex; gap:5px;" class="no-print">
                             <button onclick="cetakForm(${actualIdx})" style="background:#64748b; width:auto; padding:6px 14px; font-size:12px;">🖨️ Cetak</button>
-                            ${!isDone ? `<button onclick="selesaikanPermintaan(${actualIdx})" style="background:#10b981; width:auto; padding:6px 14px; font-size:12px;">✅ Selesai</button>` : '<span style="font-size:1.2rem;">✅</span>'}
-                            <button onclick="hapusPermintaan(${actualIdx})" style="background:#ef4444; width:auto; padding:6px 14px; font-size:12px;">❌</button>
+                            ${actionBtnText}
+                            ${deleteButtonHtml}
                         </div>
-                    </div>
-                `;
+                    </div>`;
             });
         });
 
         let searchR = document.getElementById('searchRiwayat').value.toLowerCase();
-        let rContainer = document.getElementById('riwayatContainer');
-        rContainer.innerHTML = '';
-        let filteredRiwayat = riwayat.filter(r => r.item.toLowerCase().includes(searchR) || r.operator.toLowerCase().includes(searchR));
+        let rContainer = document.getElementById('riwayatContainer'); rContainer.innerHTML = '';
+        let filteredRiwayat = riwayat.filter(r => r.item.toLowerCase().includes(searchR));
         let operators = [...new Set(filteredRiwayat.map(r => r.operator))];
-        
         operators.forEach(op => {
             rContainer.innerHTML += `<div style="font-weight:bold; margin-top:20px; color:#8b5cf6; border-bottom:2px solid #8b5cf6; padding-bottom:5px;">👤 Operator: ${op}</div>`;
-            let opRiwayat = filteredRiwayat.filter(r => r.operator === op);
-            rContainer.innerHTML += opRiwayat.map(r => `
-                <div style="display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 10px; background:#f8fafc; padding:10px; margin-top:5px; border-radius:6px; font-size:0.9rem;">
-                    <div><b>${r.item}</b></div>
-                    <div>${r.jumlahDisplay}</div>
-                    <div style="font-size:0.8rem; color:#64748b;">📍 ${r.dari}<br>🕒 ${r.tanggal}</div>
-                </div>
-            `).join('');
+            rContainer.innerHTML += filteredRiwayat.filter(r => r.operator === op).map(r => `<div style="display:grid; grid-template-columns:2fr 1fr 2fr; padding:10px; background:#f8fafc; font-size:0.9rem;"><div><b>${r.item}</b></div><div>${r.jumlahDisplay}</div><div style="color:#64748b;">📍 ${r.dari}<br>${r.tanggal}</div></div>`).join('');
         });
 
-        const rackSelect = document.getElementById('selectRack');
-        let currentRackVal = rackSelect.value;
-        rackSelect.innerHTML = '<option value="">Pilih Rak...</option>' + racks.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
-        if(currentRackVal) rackSelect.value = currentRackVal;
-
-        const filterRackSelect = document.getElementById('filterRack');
-        let currentFilterRackVal = filterRackSelect.value;
-        filterRackSelect.innerHTML = '<option value="">📁 Semua Rak...</option>' + racks.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
-        if(currentFilterRackVal) filterRackSelect.value = currentFilterRackVal;
+        document.getElementById('selectRack').innerHTML = '<option value="">Pilih Rak...</option>' + racks.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
         
         const search = document.getElementById('searchInput').value.trim().toLowerCase();
-        const filterRackValue = filterRackSelect.value;
-        const mContainer = document.getElementById('mainContainer'); 
-        mContainer.innerHTML = '';
-        
+        const filterRackValue = document.getElementById('filterRack').value;
+        const mContainer = document.getElementById('mainContainer'); mContainer.innerHTML = '';
         let totalStokPerItem = {};
 
         if (search === "" && filterRackValue === "") {
-            mContainer.innerHTML = `<div style="color:#94a3b8; text-align:center; padding:30px; border: 2px dashed #cbd5e1; border-radius:12px; font-weight:500;">Silakan pilih rak atau ketik nama/kode barang untuk memuat data visual.</div>`;
-            renderTabelTotalStok({}); 
-            return;
+            mContainer.innerHTML = `<div style="color:#94a3b8; text-align:center; padding:30px; border:2px dashed #cbd5e1; border-radius:12px;">Pilih rak atau cari barang untuk memuat data visual.</div>`;
+            renderTabelTotalStok({}); return;
         }
 
         racks.forEach(r => {
-            if (filterRackValue !== "" && r.name !== filterRackValue) {
-                return;
-            }
-
+            if (filterRackValue !== "" && r.name !== filterRackValue) return;
             let finalPalletsHtml = "";
-            let matchInRack = false; 
-
             for(let i = 1; i <= r.palletCount; i++) {
-                const pName = `Pallet ${i}`; 
+                const pName = `Pallet ${i}`;
                 const items = stok.filter(s => s.rack === r.name && s.pallet === pName);
-                
-                const matchedItems = items.filter(it => 
-                    it.item.toLowerCase().includes(search) || 
-                    (it.code && it.code.toLowerCase().includes(search))
-                );
-
-                if (search !== "" && matchedItems.length === 0) {
-                    continue;
-                }
-
-                let displayItems = search !== "" ? matchedItems : items;
-
-                if (displayItems.length === 0) {
-                    if (search !== "") {
-                        continue;
-                    }
-                }
-
-                matchInRack = true; 
+                const displayItems = items.filter(it => it.item.toLowerCase().includes(search) || (it.code && it.code.toLowerCase().includes(search)));
+                if (displayItems.length === 0) continue;
 
                 const itemsPerPage = 5;
                 const totalItems = displayItems.length;
                 const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-                
                 const pageKey = `${r.name}-${pName}`;
-                if (!palletPages[pageKey]) {
-                    palletPages[pageKey] = 1;
-                }
-                
+                if (!palletPages[pageKey]) palletPages[pageKey] = 1;
                 let currentPage = palletPages[pageKey];
-                if (currentPage > totalPages) {
-                    currentPage = totalPages;
-                    palletPages[pageKey] = totalPages;
-                }
-
+                if (currentPage > totalPages) currentPage = totalPages;
                 const startIndex = (currentPage - 1) * itemsPerPage;
-                const endIndex = startIndex + itemsPerPage;
-                const paginatedItems = displayItems.slice(startIndex, endIndex);
+                const paginatedItems = displayItems.slice(startIndex, startIndex + itemsPerPage);
 
-                let itemsHtml = paginatedItems.map((it) => { 
-                    let id = stok.indexOf(it); 
+                let itemsHtml = paginatedItems.map(it => {
+                    let id = stok.indexOf(it);
+                    let btnsHtml = '';
+                    if (currentUserRole === 'admin' || currentUserRole === 'gudang') {
+                        btnsHtml = `
+                            <button class="btn-action btn-edit" onclick="openEditModal(${id})">✏️ Edit</button>
+                            <button class="btn-action btn-move" onclick="openPindahModal(${id})">🚚 Pindah</button>
+                            <button class="btn-action btn-take" onclick="openAmbilModal(${id})">📥 Ambil</button>
+                            ${currentUserRole === 'admin' ? `<button class="btn-action btn-delete" onclick="hapusBarang(${id})">❌ Hapus</button>` : ''}
+                        `;
+                    }
                     let infoDisplay = `${it.totalPcs} Pcs`; 
                     if(it.unit.toLowerCase() !== 'pcs') infoDisplay += ` (${Math.ceil(it.totalPcs/it.isiPerUnit)} ${it.unit})`;
                     let codeDisplay = it.code ? `<br><small style="color:#6366f1;">Kode: ${it.code}</small>` : '';
-                    
-                    return `
-                        <div class="item-row">
-                            <div><b>${it.item}</b>${codeDisplay}<br><small style="color:#64748b;">Stok: ${infoDisplay}</small></div>
-                            <div class="action-btns">
-                                <button class="btn-action btn-edit" onclick="openEditModal(${id})">✏️ Edit</button>
-                                <button class="btn-action btn-move" onclick="openPindahModal(${id})">🚚 Pindah</button>
-                                <button class="btn-action btn-take" onclick="openAmbilModal(${id})">📥 Ambil</button>
-                                <button class="btn-action btn-delete" onclick="hapusBarang(${id})">❌ Hapus</button>
-                            </div>
-                        </div>
-                    `; 
-                }).join('');
 
-                if (itemsHtml === "") {
-                    itemsHtml = `<div style="color: #94a3b8; font-size: 0.8rem; text-align: center; padding: 10px;">Kosong</div>`;
-                }
+                    return `<div class="item-row"><div><b>${it.item}</b>${codeDisplay}<br><small style="color:#64748b;">Stok: ${infoDisplay}</small></div><div class="action-btns">${btnsHtml}</div></div>`;
+                }).join('');
 
                 let paginationHtml = "";
                 if (totalPages > 1) {
                     let pageButtons = "";
                     for (let pNum = 1; pNum <= totalPages; pNum++) {
-                        pageButtons += `
-                            <button class="page-btn ${pNum === currentPage ? 'active' : ''}" onclick="setPalletPage('${r.name}', '${pName}', ${pNum})">
-                                ${pNum}
-                            </button>
-                        `;
+                        pageButtons += `<button class="page-btn ${pNum === currentPage ? 'active' : ''}" onclick="setPalletPage('${r.name}', '${pName}', ${pNum})">${pNum}</button>`;
                     }
-                    paginationHtml = `
-                        <div class="pallet-pagination">
-                            <span style="font-size: 0.7rem; color: #64748b; margin-right: 3px;">Hal:</span>
-                            ${pageButtons}
-                        </div>
-                    `;
+                    paginationHtml = `<div class="pallet-pagination"><span style="font-size: 0.7rem; color:#64748b;">Hal:</span>${pageButtons}</div>`;
                 }
 
                 displayItems.forEach(it => {
-                    if (!totalStokPerItem[it.item]) {
-                        totalStokPerItem[it.item] = { code: it.code || '-', totalPcs: 0, unit: it.unit, isi: it.isiPerUnit };
-                    }
+                    if (!totalStokPerItem[it.item]) totalStokPerItem[it.item] = { code: it.code || '-', totalPcs: 0, unit: it.unit, isi: it.isiPerUnit };
                     totalStokPerItem[it.item].totalPcs += it.totalPcs;
                 });
-                
-                finalPalletsHtml += `
-                    <div class="pallet-card">
-                        <div class="pallet-header">
-                            <span>📦 ${pName} <small style="font-weight: normal; color: #94a3b8;">(${totalItems} item)</small></span>
-                            ${paginationHtml}
-                        </div>
-                        <div style="flex-grow: 1;">
-                            ${itemsHtml}
-                        </div>
-                    </div>`;
-            }
 
-            if (!matchInRack) {
-                return;
+                finalPalletsHtml += `<div class="pallet-card"><div class="pallet-header"><span>📦 ${pName} <small style="font-weight:normal; color:#94a3b8;">(${totalItems} item)</small></span>${paginationHtml}</div><div style="flex-grow:1;">${itemsHtml}</div></div>`;
             }
-
-            if (finalPalletsHtml !== "") {
-                let rackHtml = `
-                    <div class="rack-section">
-                        <div class="rack-header-row">
-                            <h2 class="rack-title">${r.name}</h2>
-                            <button class="btn-add-pallet-spec" onclick="tambahPalletKeRak('${r.name}')">➕ Pallet</button>
-                        </div>
-                        <div class="pallet-container">${finalPalletsHtml}</div>
-                    </div>
-                `;
-                mContainer.insertAdjacentHTML('beforeend', rackHtml);
-            }
+            if(finalPalletsHtml !== "") mContainer.insertAdjacentHTML('beforeend', `<div class="rack-section"><div class="rack-header-row"><h2 class="rack-title">${r.name}</h2><button class="btn-add-pallet-spec" onclick="tambahPalletKeRak('${r.name}')">➕ Pallet</button></div><div class="pallet-container">${finalPalletsHtml}</div></div>`);
         });
+        
+        if (mContainer.innerHTML === "" && filterRackValue !== "") {
+            mContainer.innerHTML = `<div style="color:#94a3b8; text-align:center; padding:30px; border:2px dashed #cbd5e1; border-radius:12px;">Tidak ada barang yang tersimpan di <b>${filterRackValue}</b>.</div>`;
+        }
 
         renderTabelTotalStok(totalStokPerItem);
     }
@@ -971,116 +770,34 @@
     function renderTabelTotalStok(dataTotal) {
         const container = document.getElementById('totalStokBarangContainer');
         let keys = Object.keys(dataTotal);
+        if(keys.length === 0) { container.innerHTML = `<div style="color:#94a3b8; text-align:center; padding:15px; font-size:0.9rem;">Belum ada data barang. Silakan lakukan pencarian atau pilih filter rak.</div>`; return; }
         
-        if(keys.length === 0) {
-            container.innerHTML = `<div style="color:#94a3b8; text-align:center; padding:15px; font-size:0.9rem;">Belum ada data barang. Silakan lakukan pencarian atau pilih filter rak terlebih dahulu.</div>`;
-            return;
-        }
-
-        let tableRows = keys.map((itemName, index) => {
-            let item = dataTotal[itemName];
+        let tableRows = keys.map((name, idx) => {
+            let item = dataTotal[name];
             let konversiSatuan = `${item.totalPcs} Pcs`;
-            if(item.unit.toLowerCase() !== 'pcs') {
-                konversiSatuan += ` (${Math.ceil(item.totalPcs / item.isi)} ${item.unit})`;
-            }
-            return `
-                <tr>
-                    <td>${index + 1}</td>
-                    <td><b>${itemName}</b></td>
-                    <td><span style="color:#6366f1; font-weight:600;">${item.code}</span></td>
-                    <td><b>${konversiSatuan}</b></td>
-                </tr>
-            `;
+            if(item.unit.toLowerCase() !== 'pcs') konversiSatuan += ` (${Math.ceil(item.totalPcs / item.isi)} ${item.unit})`;
+            return `<tr><td>${idx + 1}</td><td><b>${name}</b></td><td><span style="color:#6366f1; font-weight:600;">${item.code}</span></td><td><b>${konversiSatuan}</b></td></tr>`;
         }).join('');
 
-        container.innerHTML = `
-            <table class="total-stock-table">
-                <thead>
-                    <tr>
-                        <th style="width: 5%;">No</th>
-                        <th>Nama Barang</th>
-                        <th>Kode Barang</th>
-                        <th>Total Akumulasi Stok</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${tableRows}
-                </tbody>
-            </table>
-        `;
+        container.innerHTML = `<table class="total-stock-table"><thead><tr><th style="width:5%;">No</th><th>Nama Barang</th><th>Kode Barang</th><th>Total Akumulasi Stok</th></tr></thead><tbody>${tableRows}</tbody></table>`;
     }
 
     function exportStokExcel() {
-        if (stok.length === 0) return alert("Tidak ada data stok untuk diexport!");
-        
-        let dataMap = stok.map((s, index) => ({
-            "No": index + 1,
-            "Nama Barang": s.item,
-            "Kode Barang": s.code || "-",
-            "Jumlah Satuan": s.qty,
-            "Satuan": s.unit,
-            "Isi Per Satuan": s.isiPerUnit,
-            "Total (Pcs)": s.totalPcs,
-            "Lokasi Rak": s.rack,
-            "Lokasi Pallet": s.pallet
-        }));
-        
-        let ws = XLSX.utils.json_to_sheet(dataMap);
-        let wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Stok Gudang");
-        XLSX.writeFile(wb, "Data_Stok_Gudang.xlsx");
+        let dataMap = stok.map((s, i) => ({"No": i + 1, "Nama Barang": s.item, "Kode Barang": s.code || "-", "Jumlah Satuan": s.qty, "Satuan": s.unit, "Isi Per Satuan": s.isiPerUnit, "Total (Pcs)": s.totalPcs, "Lokasi Rak": s.rack, "Lokasi Pallet": s.pallet}));
+        let ws = XLSX.utils.json_to_sheet(dataMap); let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Stok Gudang"); XLSX.writeFile(wb, "Data_Stok_Gudang.xlsx");
     }
-
     function exportPermintaanExcel() {
-        if (permintaan.length === 0) return alert("Tidak ada data permintaan untuk diexport!");
-        
-        let dataMap = [];
-        let no = 1;
-        
-        permintaan.forEach(p => {
-            p.items.forEach(item => {
-                dataMap.push({
-                    "No": no++,
-                    "Tanggal": p.tanggal,
-                    "Nama Peminta": p.peminta,
-                    "Departemen": p.departemen || "-",
-                    "Nama Barang": item.item,
-                    "Jumlah": item.qty,
-                    "Satuan": item.unit,
-                    "Total Pcs": item.totalPcs,
-                    "Status": p.status === 'done' ? 'Selesai' : 'Pending',
-                    "Operator Penanggung Jawab": p.operator || "-"
-                });
-            });
-        });
-        
-        let ws = XLSX.utils.json_to_sheet(dataMap);
-        let wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Permintaan");
-        XLSX.writeFile(wb, "Data_Permintaan_Barang.xlsx");
+        let dataMap = []; let no = 1;
+        permintaan.forEach(p => { p.items.forEach(item => { dataMap.push({"No": no++, "Tanggal": p.tanggal, "Nama": p.peminta, "Departemen": p.departemen || "-", "Nama Barang": item.item, "Jumlah": item.qty, "Satuan": item.unit, "Total Pcs": item.totalPcs, "Status": p.status === 'done' ? 'Selesai' : 'Pending', "Operator": p.operator || "-"}); }); });
+        let ws = XLSX.utils.json_to_sheet(dataMap); let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Permintaan"); XLSX.writeFile(wb, "Data_Permintaan_Barang.xlsx");
     }
-
     function exportRiwayatExcel() {
-        if (riwayat.length === 0) return alert("Tidak ada data riwayat untuk diexport!");
-        
-        let dataMap = riwayat.map((r, index) => ({
-            "No": index + 1,
-            "Tanggal & Waktu": r.tanggal,
-            "Nama Barang": r.item,
-            "Jumlah Pengambilan": r.jumlahDisplay,
-            "Total (Pcs)": r.jumlahPcs,
-            "Asal Lokasi": r.dari,
-            "Operator": r.operator
-        }));
-        
-        let ws = XLSX.utils.json_to_sheet(dataMap);
-        let wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Riwayat Keluar");
-        XLSX.writeFile(wb, "Data_Riwayat_Keluar.xlsx");
+        let dataMap = riwayat.map((r, i) => ({"No": i + 1, "Tanggal & Waktu": r.tanggal, "Nama Barang": r.item, "Jumlah Pengambilan": r.jumlahDisplay, "Total (Pcs)": r.jumlahPcs, "Asal Lokasi": r.dari, "Operator": r.operator}));
+        let ws = XLSX.utils.json_to_sheet(dataMap); let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Riwayat Keluar"); XLSX.writeFile(wb, "Data_Riwayat_Keluar.xlsx");
     }
 
     populateUnitDropdowns();
-    renderAll();
+    cekSessionLogin();
 </script>
 </body>
 </html>
