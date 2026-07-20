@@ -177,6 +177,7 @@
                 <button id="btnTambahRak" onclick="toggleForm('rackForm')" style="width: auto; background: #10b981;">➕ Tambah Rak Baru</button>
                 <button id="btnTambahSatuan" onclick="toggleForm('unitForm')" style="width: auto; background: #f59e0b;">🏷️ Tambah Satuan Baru</button>
                 <button onclick="exportStokExcel()" style="width: auto; background: #8b5cf6;">🟢 Export Excel Stok</button>
+                <button onclick="backupKeGoogleSheets()" style="width: auto; background: #059669;">📊 Sync ke Google Sheets</button>
             </div>
             
             <div id="rackForm" style="display:none; margin-top:15px; border-top: 1px dashed var(--border); padding-top: 15px;">
@@ -256,6 +257,9 @@
 <div id="pindahModal" class="modal"><div class="modal-content"><h3>🚚 Pindah Lokasi Barang</h3><p id="pindahBarangInfo" style="font-weight: 600; font-size: 0.95rem; color: #4f46e5; margin-bottom: 15px;"></p><label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Rak Tujuan:</label><select id="pindahRack" onchange="updatePindahPalletDropdown()" style="margin-bottom: 15px; margin-top: 5px;"></select><label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Pallet Tujuan:</label><select id="pindahPallet" style="margin-bottom: 20px; margin-top: 5px;"></select><div style="display: flex; gap: 10px;"><button onclick="prosesPindah()" style="background:#10b981; flex:1;">Pindahkan</button><button onclick="closeModal('pindahModal')" style="background:#64748b; flex:1;">Batal</button></div></div></div>
 
 <script>
+    // URL GOOGLE APPS SCRIPT
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxN3EhwGIOMis9gRWTfOvAXUAh9lzVWvFVYNFMjqy6IK8JC5HrlPOUgJQiRj4kJDU4XlA/exec";
+
     // Konfigurasi Kredensial Akses Aplikasi
     const ROLE_PASSWORDS = {
         admin: "admin123",
@@ -280,6 +284,29 @@
     let currentIdx = null;
     let palletPages = {};
 
+    // --- FUNGSI BACKUP OTOMATIS KE GOOGLE SHEETS ---
+    function backupKeGoogleSheets() {
+        if (!GOOGLE_SCRIPT_URL) return;
+        
+        let payload = {
+            action: "syncSemua",
+            stok: JSON.parse(localStorage.getItem('gudang_stok')) || [],
+            permintaan: JSON.parse(localStorage.getItem('gudang_permintaan')) || [],
+            riwayat: JSON.parse(localStorage.getItem('gudang_riwayat')) || []
+        };
+
+        fetch(GOOGLE_SCRIPT_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        }).then(() => {
+            console.log("Data tersinkronisasi ke Google Sheets!");
+        }).catch(err => {
+            console.error("Gagal sync data:", err);
+        });
+    }
+
     document.getElementById('operatorInput').value = localStorage.getItem('gudang_operator') || '';
     function saveOperator(val) { localStorage.setItem('gudang_operator', val); }
 
@@ -298,7 +325,6 @@
     }
     window.addEventListener('online', updateConnectionStatus); window.addEventListener('offline', updateConnectionStatus); updateConnectionStatus();
 
-    // Fungsi Toggle Visibilitas Password
     function togglePasswordVisibility(inputId, iconEl) {
         const passwordInput = document.getElementById(inputId);
         if (passwordInput.type === "password") {
@@ -310,7 +336,6 @@
         }
     }
 
-    // ================= SINKRONISASI MANAJEMEN ROLE & AKSES TAB =================
     function cekSessionLogin() {
         if (currentUserRole) {
             document.getElementById('loginScreen').style.display = 'none';
@@ -346,7 +371,6 @@
         } else {
             document.getElementById('loginScreen').style.display = 'flex';
             document.getElementById('mainApp').style.display = 'none';
-            // Reset visibility password saat log out
             const loginPass = document.getElementById('loginPassword');
             loginPass.type = "password";
             const eyeIcon = loginPass.nextElementSibling;
@@ -501,6 +525,7 @@
         document.getElementById('reqNamaPeminta').value = '';
         document.getElementById('reqDepartemen').value = '';
         renderDraft(); renderAll();
+        backupKeGoogleSheets();
         alert("Permintaan berhasil dikirim!");
     }
 
@@ -512,6 +537,7 @@
         permintaan[idx].operator = op; 
         localStorage.setItem('gudang_permintaan', JSON.stringify(permintaan));
         renderAll();
+        backupKeGoogleSheets();
         alert(`Permintaan diselesaikan oleh: ${op}`);
     }
 
@@ -521,6 +547,7 @@
             permintaan.splice(idx, 1);
             localStorage.setItem('gudang_permintaan', JSON.stringify(permintaan));
             renderAll();
+            backupKeGoogleSheets();
         }
     }
 
@@ -542,21 +569,6 @@
         window.print();
     }
 
-    function cetakSemuaUserHariIni(nama) {
-        const today = new Date().toLocaleDateString('id-ID');
-        const userReqs = permintaan.filter(p => p.peminta === nama && p.tanggal === today);
-        if (userReqs.length === 0) return alert("Tidak ada permintaan untuk nama ini hari ini.");
-        let allItems = [];
-        userReqs.forEach(p => { p.items.forEach(item => { allItems.push({ ...item, operator: p.status === 'done' ? p.operator : '-' }); }); });
-        const pSheet = document.getElementById('print-sheet');
-        pSheet.innerHTML = `<h2>REKAP PERMINTAAN HARIAN</h2><p>Nama: ${nama} | Tanggal: ${today}</p>
-            <table style="width:100%; border-collapse:collapse;">
-                <thead><tr style="background:#333; color:white;"><th>No</th><th>Barang</th><th>Jumlah</th><th>Satuan</th><th>Total Pcs</th><th>Pemberi</th></tr></thead>
-                <tbody>${allItems.map((item, i) => `<tr><td>${i+1}</td><td>${item.item}</td><td>${item.qty}</td><td>${item.unit}</td><td>${item.totalPcs}</td><td>${item.operator}</td></tr>`).join('')}</tbody>
-            </table>`;
-        window.print();
-    }
-
     function simpanBarang() {
         let op = localStorage.getItem('gudang_operator');
         if(!op || op.trim() === "") return alert("Wajib mengisi 'Nama Operator' di bagian atas halaman!");
@@ -573,6 +585,7 @@
         localStorage.setItem('gudang_stok', JSON.stringify(stok));
         document.getElementById('inputNamaBarang').value = ''; document.getElementById('inputKodeBarang').value = ''; document.getElementById('inputQty').value = '';
         renderAll();
+        backupKeGoogleSheets();
     }
     
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
@@ -595,6 +608,7 @@
         item.totalPcs = item.qty * ((item.unit.toLowerCase() !== 'pcs') ? item.isiPerUnit : 1);
         localStorage.setItem('gudang_stok', JSON.stringify(stok));
         renderAll(); closeModal('editModal');
+        backupKeGoogleSheets();
     }
 
     function openPindahModal(idx) {
@@ -610,6 +624,7 @@
         item.rack = document.getElementById('pindahRack').value; item.pallet = document.getElementById('pindahPallet').value;
         localStorage.setItem('gudang_stok', JSON.stringify(stok));
         closeModal('pindahModal'); renderAll();
+        backupKeGoogleSheets();
     }
     
     function prosesAmbil() {
@@ -625,15 +640,16 @@
         item.totalPcs -= totalAmbil; if (item.totalPcs <= 0) stok.splice(currentIdx, 1);
         localStorage.setItem('gudang_stok', JSON.stringify(stok));
         renderAll(); closeModal('ambilModal');
+        backupKeGoogleSheets();
     }
     
     function hapusBarang(idx) { 
         if(currentUserRole !== 'admin') return alert("Hanya admin yang bisa menghapus item dari stok secara permanen!");
-        if(confirm("Apakah Anda yakin ingin menghapus item ini?")) { stok.splice(idx, 1); localStorage.setItem('gudang_stok', JSON.stringify(stok)); renderAll(); } 
+        if(confirm("Apakah Anda yakin ingin menghapus item ini?")) { stok.splice(idx, 1); localStorage.setItem('gudang_stok', JSON.stringify(stok)); renderAll(); backupKeGoogleSheets(); } 
     }
     function bersihkanRiwayat() { 
         if(currentUserRole !== 'admin') return alert("Akses Ditolak! Anda tidak bisa menghapus riwayat keluar.");
-        if(confirm("Hapus semua riwayat keluar?")) { riwayat = []; localStorage.setItem('gudang_riwayat', JSON.stringify(riwayat)); renderAll(); } 
+        if(confirm("Hapus semua riwayat keluar?")) { riwayat = []; localStorage.setItem('gudang_riwayat', JSON.stringify(riwayat)); renderAll(); backupKeGoogleSheets(); } 
     }
 
     function updateUnitForRequest() {
@@ -659,7 +675,7 @@
         pemintas.forEach(nama => {
             let userReqs = filteredPerm.filter(p => p.peminta === nama);
             pContainer.innerHTML += `<div style="font-weight:bold; margin-top:20px; color:#8b5cf6; border-bottom:2px solid #8b5cf6; padding-bottom:5px; display:flex; justify-content:space-between; align-items:center;">
-                <span>👤 Nama: ${nama}</span><button onclick="cetakSemuaUserHariIni('${nama}')" style="background:#6366f1; padding:4px 8px; font-size:11px;" class="no-print">🖨️ Cetak Rekap</button></div>`;
+                <span>👤 Nama: ${nama}</span></div>`;
             
             userReqs.forEach(p => {
                 let actualIdx = permintaan.indexOf(p);
