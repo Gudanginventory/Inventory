@@ -261,10 +261,10 @@
 <script>
     // ================= URL INTEGRASI GOOGLE SHEETS =================
     // PASTE URL DARI GOOGLE APPS SCRIPT ANDA DI SINI
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxN3EhwGIOMis9gRWTfOvAXUAh9lzVWvFVYNFMjqy6IK8JC5HrlPOUgJQiRj4kJDU4XlA/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwYjZFtEEjdf_-aNwmY9anzkI3tIDK-D5N9c__OgC5nlcKcBBMi6Zgrx9SDyLTRdgcGWQ/exec";
 
     function sendToGoogleSheet(data) {
-        if (!SCRIPT_URL || SCRIPT_URL.includes("https://script.google.com/macros/s/AKfycbxN3EhwGIOMis9gRWTfOvAXUAh9lzVWvFVYNFMjqy6IK8JC5HrlPOUgJQiRj4kJDU4XlA/exec")) return;
+        if (!SCRIPT_URL || SCRIPT_URL.includes("https://script.google.com/macros/s/AKfycbwYjZFtEEjdf_-aNwmY9anzkI3tIDK-D5N9c__OgC5nlcKcBBMi6Zgrx9SDyLTRdgcGWQ/exec")) return;
         fetch(SCRIPT_URL, {
             method: "POST",
             mode: "no-cors",
