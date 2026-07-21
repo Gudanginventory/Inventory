@@ -259,6 +259,20 @@
 <div id="pindahModal" class="modal"><div class="modal-content"><h3>🚚 Pindah Lokasi Barang</h3><p id="pindahBarangInfo" style="font-weight: 600; font-size: 0.95rem; color: #4f46e5; margin-bottom: 15px;"></p><label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Rak Tujuan:</label><select id="pindahRack" onchange="updatePindahPalletDropdown()" style="margin-bottom: 15px; margin-top: 5px;"></select><label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Pallet Tujuan:</label><select id="pindahPallet" style="margin-bottom: 20px; margin-top: 5px;"></select><div style="display: flex; gap: 10px;"><button onclick="prosesPindah()" style="background:#10b981; flex:1;">Pindahkan</button><button onclick="closeModal('pindahModal')" style="background:#64748b; flex:1;">Batal</button></div></div></div>
 
 <script>
+    // ================= URL INTEGRASI GOOGLE SHEETS =================
+    // PASTE URL DARI GOOGLE APPS SCRIPT ANDA DI SINI
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxN3EhwGIOMis9gRWTfOvAXUAh9lzVWvFVYNFMjqy6IK8JC5HrlPOUgJQiRj4kJDU4XlA/exec";
+
+    function sendToGoogleSheet(data) {
+        if (!SCRIPT_URL || SCRIPT_URL.includes("https://script.google.com/macros/s/AKfycbxN3EhwGIOMis9gRWTfOvAXUAh9lzVWvFVYNFMjqy6IK8JC5HrlPOUgJQiRj4kJDU4XlA/exec")) return;
+        fetch(SCRIPT_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        }).catch(err => console.error("Error Sync Sheet:", err));
+    }
+
     // Konfigurasi Kredensial Akses Aplikasi
     const ROLE_PASSWORDS = {
         admin: "admin123",
@@ -497,13 +511,20 @@
         const peminta = document.getElementById('reqNamaPeminta').value;
         const departemen = document.getElementById('reqDepartemen').value || "-";
         if(!peminta) return alert("Isi Nama terlebih dahulu!");
-        permintaan.push({ peminta, departemen, items: draftItems, tanggal: new Date().toLocaleDateString('id-ID'), status: 'pending', operator: '' });
+        
+        let tgl = new Date().toLocaleDateString('id-ID');
+        permintaan.push({ peminta, departemen, items: draftItems, tanggal: tgl, status: 'pending', operator: '' });
         localStorage.setItem('gudang_permintaan', JSON.stringify(permintaan));
+        
+        // Auto Sync ke Google Sheets
+        let rowsToSend = draftItems.map(d => [tgl, peminta, departemen, d.item, d.qty, d.unit, d.totalPcs, 'Pending', '-']);
+        sendToGoogleSheet(rowsToSend);
+
         draftItems = [];
         document.getElementById('reqNamaPeminta').value = '';
         document.getElementById('reqDepartemen').value = '';
         renderDraft(); renderAll();
-        alert("Permintaan berhasil dikirim!");
+        alert("Permintaan berhasil dikirim dan tersinkron ke Google Sheet!");
     }
 
     function selesaikanPermintaan(idx) {
@@ -855,7 +876,7 @@
             let item = dataTotal[name];
             let konversiSatuan = `${item.totalPcs} Pcs`;
             if(item.unit.toLowerCase() !== 'pcs') konversiSatuan += ` (${Math.ceil(item.totalPcs / item.isi)} ${item.unit})`;
-            return `<tr><td>${idx + 1}</td><td><b>${name}</b></td><td><span style="color:#6366f1; font-weight:600;">${item.code}</span></td><td><b>${konversiSatuan}</b></td></tr>`;
+            return `<tr><td>${idx + 1}</td><td><b>${name}</b></td><td><span style="color:#6363f1; font-weight:600;">${item.code}</span></td><td><b>${konversiSatuan}</b></td></tr>`;
         }).join('');
 
         container.innerHTML = `<table class="total-stock-table"><thead><tr><th style="width:5%;">No</th><th>Nama Barang</th><th>Kode Barang</th><th>Total Akumulasi Stok</th></tr></thead><tbody>${tableRows}</tbody></table>`;
