@@ -38,7 +38,7 @@
         .toggle-password { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #94a3b8; user-select: none; font-size: 1.1rem; }
         .toggle-password:hover { color: var(--primary); }
 
-        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
         .tab-btn { padding: 10px 20px; border-radius: 8px; cursor: pointer; background: #e2e8f0; border: none; font-weight: 600; }
         .tab-btn.active { background: var(--primary); color: white; }
         .tab-content { display: none; } .tab-content.active { display: block; }
@@ -72,6 +72,19 @@
         .total-stock-table th, .total-stock-table td { padding: 12px; border: 1px solid var(--border); text-align: left; }
         .total-stock-table th { background-color: #f1f5f9; color: var(--text-main); font-weight: 600; }
         .total-stock-table tr:hover { background-color: #f8fafc; }
+
+        .badge-type {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 4px;
+        }
+        .badge-masuk { background-color: #10b981; }
+        .badge-keluar { background-color: #ef4444; }
+        .badge-pindah { background-color: #3b82f6; }
 
         .status-koneksi {
             position: fixed;
@@ -149,8 +162,9 @@
     
     <div class="tabs" id="mainTabs">
         <button class="tab-btn active" id="tabBtnGudang" onclick="switchTab('gudang', this)">📦 Stok Gudang</button>
+        <button class="tab-btn" id="tabBtnLimit" onclick="switchTab('limit', this)">⚠️ Barang Limit</button>
         <button class="tab-btn" id="tabBtnPermintaan" onclick="switchTab('permintaan', this)">📝 Permintaan</button>
-        <button class="tab-btn" id="tabBtnRiwayat" onclick="switchTab('riwayat', this)">📜 Riwayat Keluar</button>
+        <button class="tab-btn" id="tabBtnRiwayat" onclick="switchTab('riwayat', this)">📜 Riwayat Aktivitas</button>
     </div>
 
     <!-- Tab Stok Gudang -->
@@ -164,19 +178,24 @@
                 <input type="text" id="operatorInput" placeholder="👤 Operator..." onchange="saveOperator(this.value)">
             </div>
         </div>
+
+        <!-- Form Input Barang (Hanya Tampil untuk Admin) -->
         <div class="card" id="formInputBarangCard">
-            <div class="grid-input" style="margin-top: 0;">
+            <h4>📥 Form Input Tambah Barang</h4>
+            <div class="grid-input" style="margin-top: 10px;">
                 <input id="inputNamaBarang" placeholder="Nama Barang">
                 <input id="inputKodeBarang" placeholder="Kode Barang">
                 <input id="inputQty" type="number" placeholder="Jumlah Awal Satuan">
                 <select id="unit"></select>
                 <input id="inputIsi" type="number" placeholder="Isi per Satuan (jika bukan Pcs)">
+                <input id="inputLimit" type="number" placeholder="Limit Minimum (dalam Pcs)" title="Batas minimum stok untuk peringatan">
                 <select id="selectRack" onchange="updatePalletDropdown()"><option value="">Pilih Rak...</option></select>
                 <select id="selectPallet"><option value="">Pilih Pallet...</option></select>
             </div>
             <button onclick="simpanBarang()" style="margin-top: 15px; width: 100%;">💾 Simpan ke Inventory</button>
         </div>
         
+        <!-- Form Konfigurasi (Hanya Tampil untuk Admin) -->
         <div class="card" id="formConfigCard">
             <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
                 <button id="btnTambahRak" onclick="toggleForm('rackForm')" style="width: auto; background: #10b981;">➕ Tambah Rak Baru</button>
@@ -212,6 +231,20 @@
         </div>
     </div>
 
+    <!-- Tab Barang Limit -->
+    <div id="limit" class="tab-content">
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                <h3>⚠️ Daftar Barang Mencapai / Mendekati Limit</h3>
+                <button onclick="exportLimitExcel()" style="background: #10b981; width: auto; padding: 8px 15px;">🟢 Export Excel Barang Limit</button>
+            </div>
+            <p style="font-size: 0.85rem; color: #64748b; margin-top: -10px; margin-bottom: 15px;">
+                Halaman ini menampilkan seluruh barang yang total stok akumulasinya dalam satuan <b>Pcs</b> telah mencapai atau kurang dari batas <b>Limit Minimum</b> yang ditentukan.
+            </p>
+            <div id="barangLimitContainer"></div>
+        </div>
+    </div>
+
     <!-- Tab Permintaan -->
     <div id="permintaan" class="tab-content">
         <div class="card">
@@ -239,7 +272,7 @@
                     <button onclick="exportPermintaanExcel()" style="background: #10b981; width: auto; padding: 8px 15px;">🟢 Export Excel</button>
                 </div>
             </div>
-            <input type="text" id="searchPermintaan" placeholder="🔍 Cari nama/departemen/barang..." oninput="renderAll()" style="margin-bottom: 10px;">
+            <input type="text" id="searchPermintaan" placeholder="🔍 Cari nama/departemen/barang/kode..." oninput="renderAll()" style="margin-bottom: 10px;">
             <div id="permintaanContainer"></div>
         </div>
     </div>
@@ -248,10 +281,20 @@
     <div id="riwayat" class="tab-content">
         <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3>📜 Semua Riwayat Keluar</h3>
+                <h3>📜 Riwayat Aktivitas Barang</h3>
                 <button onclick="exportRiwayatExcel()" style="background: #10b981; width: auto; padding: 8px 15px;">🟢 Export Excel</button>
             </div>
-            <input type="text" id="searchRiwayat" placeholder="🔍 Cari riwayat (Barang/Operator)..." oninput="renderAll()" style="margin: 5px;">
+            
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 15px;">
+                <input type="text" id="searchRiwayat" placeholder="🔍 Cari riwayat (Barang/Kode/Operator)..." oninput="renderAll()">
+                <select id="filterTipeRiwayat" onchange="renderAll()">
+                    <option value="">📂 Semua Tipe Riwayat</option>
+                    <option value="keluar">🔴 Riwayat Keluar</option>
+                    <option value="masuk">🟢 Riwayat Masuk</option>
+                    <option value="pindah">🔵 Riwayat Pindah</option>
+                </select>
+            </div>
+
             <div id="riwayatContainer"></div>
             <button id="btnHapusSemuaRiwayat" onclick="bersihkanRiwayat()" style="background:#ef4444; margin-top:20px; width: auto;">🗑️ Hapus Semua Riwayat</button>
         </div>
@@ -259,9 +302,52 @@
 </div>
 
 <!-- Modal Modifikasi Data -->
-<div id="ambilModal" class="modal"><div class="modal-content"><h3>📥 Ambil Barang</h3><input type="number" id="qtyAmbil" value="1" placeholder="Jumlah" style="margin-bottom: 10px;"><select id="unitAmbil" style="margin-bottom: 10px;"></select><input type="text" id="operatorAmbilModal" placeholder="Nama Operator" style="margin-bottom: 15px; background: #f1f5f9;" readonly><div style="display: flex; gap: 10px;"><button onclick="prosesAmbil()" style="background:#10b981; flex:1;">Ambil</button><button onclick="closeModal('ambilModal')" style="background:#64748b; flex:1;">Batal</button></div></div></div>
-<div id="editModal" class="modal"><div class="modal-content"><h3>✏️ Edit Data Barang</h3><input type="text" id="editNama" placeholder="Nama Barang" style="margin-bottom: 10px;"><input type="text" id="editKode" placeholder="Kode Barang" style="margin-bottom: 10px;"><input type="number" id="editQty" placeholder="Jumlah Awal" style="margin-bottom: 10px;"><select id="editUnit" style="margin-bottom: 10px;"></select><input type="number" id="editIsi" placeholder="Isi per Satuan" style="margin-bottom: 10px;"><select id="editRack" onchange="updateEditPalletDropdown()" style="margin-bottom: 10px;"></select><select id="editPallet" style="margin-bottom: 15px;"></select><div style="display: flex; gap: 10px;"><button onclick="saveEdit()" style="background:#3b82f6; flex:1;">Simpan</button><button onclick="closeModal('editModal')" style="background:#64748b; flex:1;">Batal</button></div></div></div>
-<div id="pindahModal" class="modal"><div class="modal-content"><h3>🚚 Pindah Lokasi Barang</h3><p id="pindahBarangInfo" style="font-weight: 600; font-size: 0.95rem; color: #4f46e5; margin-bottom: 15px;"></p><label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Rak Tujuan:</label><select id="pindahRack" onchange="updatePindahPalletDropdown()" style="margin-bottom: 15px; margin-top: 5px;"></select><label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Pallet Tujuan:</label><select id="pindahPallet" style="margin-bottom: 20px; margin-top: 5px;"></select><div style="display: flex; gap: 10px;"><button onclick="prosesPindah()" style="background:#10b981; flex:1;">Pindahkan</button><button onclick="closeModal('pindahModal')" style="background:#64748b; flex:1;">Batal</button></div></div></div>
+<div id="ambilModal" class="modal">
+    <div class="modal-content">
+        <h3>📥 Ambil Barang</h3>
+        <input type="number" id="qtyAmbil" value="1" placeholder="Jumlah" style="margin-bottom: 10px;">
+        <select id="unitAmbil" style="margin-bottom: 10px;"></select>
+        <input type="text" id="operatorAmbilModal" placeholder="Nama Operator" style="margin-bottom: 10px; background: #f1f5f9;" readonly>
+        <input type="text" id="tujuanAmbilModal" placeholder="Tujuan (Contoh: Produksi, QA, dll)" style="margin-bottom: 15px;">
+        <div style="display: flex; gap: 10px;">
+            <button onclick="prosesAmbil()" style="background:#10b981; flex:1;">Ambil</button>
+            <button onclick="closeModal('ambilModal')" style="background:#64748b; flex:1;">Batal</button>
+        </div>
+    </div>
+</div>
+
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <h3>✏️ Edit Data Barang</h3>
+        <input type="text" id="editNama" placeholder="Nama Barang" style="margin-bottom: 10px;">
+        <input type="text" id="editKode" placeholder="Kode Barang" style="margin-bottom: 10px;">
+        <input type="number" id="editQty" placeholder="Jumlah Awal" style="margin-bottom: 10px;">
+        <select id="editUnit" style="margin-bottom: 10px;"></select>
+        <input type="number" id="editIsi" placeholder="Isi per Satuan" style="margin-bottom: 10px;">
+        <input type="number" id="editLimit" placeholder="Limit Minimum (Pcs)" style="margin-bottom: 10px;">
+        <select id="editRack" onchange="updateEditPalletDropdown()" style="margin-bottom: 10px;"></select>
+        <select id="editPallet" style="margin-bottom: 15px;"></select>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="saveEdit()" style="background:#3b82f6; flex:1;">Simpan</button>
+            <button onclick="closeModal('editModal')" style="background:#64748b; flex:1;">Batal</button>
+        </div>
+    </div>
+</div>
+
+<div id="pindahModal" class="modal">
+    <div class="modal-content">
+        <h3>🚚 Pindah Lokasi Barang</h3>
+        <p id="pindahBarangInfo" style="font-weight: 600; font-size: 0.95rem; color: #4f46e5; margin-bottom: 15px;"></p>
+        <label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Rak Tujuan:</label>
+        <select id="pindahRack" onchange="updatePindahPalletDropdown()" style="margin-bottom: 15px; margin-top: 5px;"></select>
+        <label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Pallet Tujuan:</label>
+        <select id="pindahPallet" style="margin-bottom: 20px; margin-top: 5px;"></select>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="prosesPindah()" style="background:#10b981; flex:1;">Pindahkan</button>
+            <button onclick="closeModal('pindahModal')" style="background:#64748b; flex:1;">Batal</button>
+        </div>
+    </div>
+</div>
 
 <script>
     // ================= KONFIGURASI FIREBASE REALTIME DATABASE =================
@@ -379,22 +465,31 @@
 
             if (currentUserRole === 'admin') {
                 document.getElementById('tabBtnGudang').style.display = 'block';
+                document.getElementById('tabBtnLimit').style.display = 'block';
                 document.getElementById('tabBtnPermintaan').style.display = 'block';
                 document.getElementById('tabBtnRiwayat').style.display = 'block';
+                
+                // Form Input Tampil Hanya untuk Admin
                 document.getElementById('formInputBarangCard').style.display = 'block';
                 document.getElementById('formConfigCard').style.display = 'block';
                 document.getElementById('btnHapusSemuaRiwayat').style.display = 'block';
+                
                 switchTab('gudang', document.getElementById('tabBtnGudang'));
             } else if (currentUserRole === 'gudang') {
                 document.getElementById('tabBtnGudang').style.display = 'block';
+                document.getElementById('tabBtnLimit').style.display = 'block';
                 document.getElementById('tabBtnPermintaan').style.display = 'block';
                 document.getElementById('tabBtnRiwayat').style.display = 'block';
-                document.getElementById('formInputBarangCard').style.display = 'block';
-                document.getElementById('formConfigCard').style.display = 'block';
+                
+                // USER GUDANG: Sembunyikan Form Input & Form Konfigurasi (Tanpa Kolom Input)
+                document.getElementById('formInputBarangCard').style.display = 'none';
+                document.getElementById('formConfigCard').style.display = 'none';
                 document.getElementById('btnHapusSemuaRiwayat').style.display = 'none';
+                
                 switchTab('gudang', document.getElementById('tabBtnGudang'));
             } else if (currentUserRole === 'permintaan') {
                 document.getElementById('tabBtnGudang').style.display = 'none';
+                document.getElementById('tabBtnLimit').style.display = 'none';
                 document.getElementById('tabBtnRiwayat').style.display = 'none';
                 document.getElementById('tabBtnPermintaan').style.display = 'block';
                 switchTab('permintaan', document.getElementById('tabBtnPermintaan'));
@@ -449,6 +544,7 @@
     function setPalletPage(rackName, palletName, pageNum) { palletPages[`${rackName}-${palletName}`] = pageNum; renderAll(); }
 
     function tambahPalletKeRak(rackName) {
+        if(currentUserRole !== 'admin') return alert("Hanya admin yang dapat menambah pallet!");
         const rackIndex = racks.findIndex(r => r.name === rackName);
         if (rackIndex !== -1) {
             racks[rackIndex].palletCount += 1;
@@ -519,9 +615,10 @@
         const unit = document.getElementById('reqUnit').value;
         if(!itemName || !qty || !unit) return alert("Pilih barang, isi jumlah, dan satuan!");
         const itemInStok = stok.find(s => s.item === itemName);
+        const code = itemInStok ? (itemInStok.code || '-') : '-';
         const isi = itemInStok ? itemInStok.isiPerUnit : 1;
         const totalPcs = qty * (unit.toLowerCase() !== 'pcs' ? isi : 1);
-        draftItems.push({ item: itemName, qty, unit, totalPcs });
+        draftItems.push({ item: itemName, code: code, qty, unit, totalPcs });
         renderDraft();
         document.getElementById('reqNamaBarang').value = '';
         document.getElementById('reqQty').value = '';
@@ -532,7 +629,7 @@
         const dCont = document.getElementById('draftContainer');
         dCont.innerHTML = draftItems.map((d, i) => `
             <div style="display:flex; justify-content:space-between; margin-bottom:5px; background:#f1f5f9; padding:8px; border-radius:6px;">
-                <span>• ${d.item} (${d.qty} ${d.unit} / <b>${d.totalPcs} Pcs</b>)</span>
+                <span>• ${d.item} ${d.code && d.code !== '-' ? '<small style="color:#6366f1;">['+d.code+']</small>' : ''} (${d.qty} ${d.unit} / <b>${d.totalPcs} Pcs</b>)</span>
                 <button onclick="draftItems.splice(${i},1); renderDraft();" style="background:#ef4444; width:auto; padding:2px 8px; font-size:11px;">Hapus</button>
             </div>
         `).join('');
@@ -582,8 +679,8 @@
                 <tr><td style="border: 1px solid #000; padding: 10px; width: 50%;"><strong>Tanggal :</strong> ${p.tanggal}</td><td style="border: 1px solid #000; padding: 10px; width: 50%;"><strong>Status Permintaan :</strong> ${p.status.toUpperCase()}</td></tr>
             </table>
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
-                <thead><tr style="background: #333; color: white;"><th style="border: 1px solid #000; padding: 8px;">No</th><th style="border: 1px solid #000; padding: 8px;">Nama Barang</th><th style="border: 1px solid #000; padding: 8px;">Jumlah</th><th style="border: 1px solid #000; padding: 8px;">Satuan</th><th style="border: 1px solid #000; padding: 8px;">Total Pcs</th><th style="border: 1px solid #000; padding: 8px; width: 25%;">Pemberi</th></tr></thead>
-                <tbody>${p.items.map((item, i) => `<tr><td style="border: 1px solid #000; padding: 8px; text-align:center;">${i+1}</td><td style="border: 1px solid #000; padding: 8px;">${item.item}</td><td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.qty}</td><td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.unit}</td><td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.totalPcs}</td><td style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">${namaPemberi1}</td></tr>`).join('')}</tbody>
+                <thead><tr style="background: #333; color: white;"><th style="border: 1px solid #000; padding: 8px;">No</th><th style="border: 1px solid #000; padding: 8px;">Kode Barang</th><th style="border: 1px solid #000; padding: 8px;">Nama Barang</th><th style="border: 1px solid #000; padding: 8px;">Jumlah</th><th style="border: 1px solid #000; padding: 8px;">Satuan</th><th style="border: 1px solid #000; padding: 8px;">Total Pcs</th><th style="border: 1px solid #000; padding: 8px; width: 20%;">Pemberi</th></tr></thead>
+                <tbody>${p.items.map((item, i) => `<tr><td style="border: 1px solid #000; padding: 8px; text-align:center;">${i+1}</td><td style="border: 1px solid #000; padding: 8px; text-align:center;">${item.code || '-'}</td><td style="border: 1px solid #000; padding: 8px;">${item.item}</td><td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.qty}</td><td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.unit}</td><td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.totalPcs}</td><td style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">${namaPemberi1}</td></tr>`).join('')}</tbody>
             </table>
         `;
         window.print();
@@ -598,8 +695,8 @@
         const pSheet = document.getElementById('print-sheet');
         pSheet.innerHTML = `<h2>REKAP PERMINTAAN HARIAN</h2><p>Nama: ${nama} | Tanggal: ${today}</p>
             <table style="width:100%; border-collapse:collapse;">
-                <thead><tr style="background:#333; color:white;"><th>No</th><th>Departemen</th><th>Barang</th><th>Jumlah</th><th>Satuan</th><th>Total Pcs</th><th>Pemberi</th></tr></thead>
-                <tbody>${allItems.map((item, i) => `<tr><td>${i+1}</td><td>${item.departemen}</td><td>${item.item}</td><td>${item.qty}</td><td>${item.unit}</td><td>${item.totalPcs}</td><td>${item.operator}</td></tr>`).join('')}</tbody>
+                <thead><tr style="background:#333; color:white;"><th>No</th><th>Departemen</th><th>Kode Barang</th><th>Nama Barang</th><th>Jumlah</th><th>Satuan</th><th>Total Pcs</th><th>Pemberi</th></tr></thead>
+                <tbody>${allItems.map((item, i) => `<tr><td>${i+1}</td><td>${item.departemen}</td><td>${item.code || '-'}</td><td>${item.item}</td><td>${item.qty}</td><td>${item.unit}</td><td>${item.totalPcs}</td><td>${item.operator}</td></tr>`).join('')}</tbody>
             </table>`;
         window.print();
     }
@@ -623,6 +720,7 @@
             p.items.forEach(item => {
                 pemintaGroup[p.peminta].items.push({
                     item: item.item,
+                    code: item.code || '-',
                     qty: item.qty,
                     unit: item.unit,
                     totalPcs: item.totalPcs,
@@ -651,17 +749,19 @@
                         <thead>
                             <tr style="background: #e2e8f0; color: #000;">
                                 <th style="border: 1px solid #000; padding: 6px; width: 5%;">No</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 15%;">Kode Barang</th>
                                 <th style="border: 1px solid #000; padding: 6px;">Nama Barang</th>
-                                <th style="border: 1px solid #000; padding: 6px; width: 12%;">Jumlah</th>
-                                <th style="border: 1px solid #000; padding: 6px; width: 12%;">Satuan</th>
-                                <th style="border: 1px solid #000; padding: 6px; width: 15%;">Total Pcs</th>
-                                <th style="border: 1px solid #000; padding: 6px; width: 20%;">Pemberi / Op</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 10%;">Jumlah</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 10%;">Satuan</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 12%;">Total Pcs</th>
+                                <th style="border: 1px solid #000; padding: 6px; width: 18%;">Pemberi / Op</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${groupData.items.map((it, i) => `
                                 <tr>
                                     <td style="border: 1px solid #000; padding: 6px; text-align: center;">${i + 1}</td>
+                                    <td style="border: 1px solid #000; padding: 6px; text-align: center;">${it.code}</td>
                                     <td style="border: 1px solid #000; padding: 6px;">${it.item}</td>
                                     <td style="border: 1px solid #000; padding: 6px; text-align: center;">${it.qty}</td>
                                     <td style="border: 1px solid #000; padding: 6px; text-align: center;">${it.unit}</td>
@@ -684,20 +784,36 @@
         let op = localStorage.getItem('gudang_operator');
         if(!op || op.trim() === "") return alert("Wajib mengisi 'Nama Operator' di bagian atas halaman!");
         const item = document.getElementById('inputNamaBarang').value;
-        const code = document.getElementById('inputKodeBarang').value; 
+        const code = document.getElementById('inputKodeBarang').value || '-'; 
         const qty = parseInt(document.getElementById('inputQty').value);
         const unit = document.getElementById('unit').value;
         const isi = parseInt(document.getElementById('inputIsi').value) || 1;
+        const limit = parseInt(document.getElementById('inputLimit').value) || 0;
         const rack = document.getElementById('selectRack').value;
         const pallet = document.getElementById('selectPallet').value;
         if(!item || isNaN(qty) || !unit || !rack || !pallet) return alert("Lengkapi data barang, jumlah, rak, dan pallet!");
         
         let multiplier = (unit.toLowerCase() !== 'pcs') ? isi : 1;
-        db.ref('stok').push({ item, code, qty, unit, isiPerUnit: isi, totalPcs: qty * multiplier, rack, pallet });
+        let totalPcs = qty * multiplier;
+
+        db.ref('stok').push({ item, code, qty, unit, isiPerUnit: isi, limitStok: limit, totalPcs, rack, pallet });
+
+        // Simpan Catatan ke Riwayat (Tipe: Masuk)
+        db.ref('riwayat').push({
+            type: 'masuk',
+            item: item,
+            code: code,
+            jumlahDisplay: `${qty} ${unit}`,
+            jumlahPcs: totalPcs,
+            operator: op,
+            keterangan: `Ke ${rack} - ${pallet}`,
+            tanggal: new Date().toLocaleString('id-ID')
+        });
         
         document.getElementById('inputNamaBarang').value = ''; 
         document.getElementById('inputKodeBarang').value = ''; 
         document.getElementById('inputQty').value = '';
+        document.getElementById('inputLimit').value = '';
     }
     
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
@@ -706,6 +822,7 @@
         currentFirebaseKey = key; 
         document.getElementById('ambilModal').style.display = 'flex'; 
         document.getElementById('operatorAmbilModal').value = localStorage.getItem('gudang_operator') || ''; 
+        document.getElementById('tujuanAmbilModal').value = ''; 
     }
     
     function openEditModalByKey(key) {
@@ -717,6 +834,7 @@
         document.getElementById('editQty').value = item.qty; 
         document.getElementById('editUnit').value = item.unit; 
         document.getElementById('editIsi').value = item.isiPerUnit;
+        document.getElementById('editLimit').value = item.limitStok || 0;
         document.getElementById('editRack').innerHTML = racks.map(r => `<option value="${r.name}" ${r.name === item.rack ? 'selected' : ''}>${r.name}</option>`).join('');
         updateEditPalletDropdown(); 
         document.getElementById('editPallet').value = item.pallet;
@@ -733,12 +851,13 @@
         let editQty = parseInt(document.getElementById('editQty').value);
         let editUnit = document.getElementById('editUnit').value;
         let editIsi = parseInt(document.getElementById('editIsi').value) || 1;
+        let editLimit = parseInt(document.getElementById('editLimit').value) || 0;
         let editRack = document.getElementById('editRack').value;
         let editPallet = document.getElementById('editPallet').value;
         let totalPcs = editQty * ((editUnit.toLowerCase() !== 'pcs') ? editIsi : 1);
 
         db.ref('stok/' + key).update({
-            item: editNama, code: editKode, qty: editQty, unit: editUnit, isiPerUnit: editIsi, rack: editRack, pallet: editPallet, totalPcs: totalPcs
+            item: editNama, code: editKode, qty: editQty, unit: editUnit, isiPerUnit: editIsi, limitStok: editLimit, rack: editRack, pallet: editPallet, totalPcs: totalPcs
         });
 
         closeModal('editModal');
@@ -756,16 +875,41 @@
     }
 
     function prosesPindah() {
+        let op = localStorage.getItem('gudang_operator') || 'Sistem';
         let key = currentFirebaseKey;
-        let rack = document.getElementById('pindahRack').value;
-        let pallet = document.getElementById('pindahPallet').value;
-        db.ref('stok/' + key).update({ rack, pallet });
+        let item = stok.find(s => s._key === key);
+        if(!item) return;
+
+        let rackTujuan = document.getElementById('pindahRack').value;
+        let palletTujuan = document.getElementById('pindahPallet').value;
+
+        let lokasiAsal = `${item.rack} - ${item.pallet}`;
+        let lokasiTujuan = `${rackTujuan} - ${palletTujuan}`;
+
+        db.ref('stok/' + key).update({ rack: rackTujuan, pallet: palletTujuan });
+
+        // Simpan Catatan ke Riwayat (Tipe: Pindah)
+        db.ref('riwayat').push({
+            type: 'pindah',
+            item: item.item,
+            code: item.code || '-',
+            jumlahDisplay: `${item.totalPcs} Pcs`,
+            jumlahPcs: item.totalPcs,
+            operator: op,
+            keterangan: `Dari (${lokasiAsal}) ➔ Ke (${lokasiTujuan})`,
+            tanggal: new Date().toLocaleString('id-ID')
+        });
+
         closeModal('pindahModal');
     }
     
     function prosesAmbil() {
         let operator = document.getElementById('operatorAmbilModal').value;
+        let tujuan = document.getElementById('tujuanAmbilModal').value.trim();
+        
         if(!operator || operator.trim() === "") return alert("Nama Operator wajib diisi!");
+        if(!tujuan) return alert("Tujuan wajib diisi! (Misal: Produksi, QA, dll)");
+        
         let ambil = parseInt(document.getElementById('qtyAmbil').value);
         let unit = document.getElementById('unitAmbil').value;
         
@@ -775,12 +919,16 @@
         let totalAmbil = ambil * ((unit.toLowerCase() !== 'pcs') ? item.isiPerUnit : 1);
         if(totalAmbil > item.totalPcs) return alert("Stok tidak mencukupi!");
 
+        // Simpan Catatan ke Riwayat (Tipe: Keluar)
         db.ref('riwayat').push({ 
+            type: 'keluar',
             item: item.item, 
+            code: item.code || '-',
             jumlahDisplay: `${ambil} ${unit}`, 
             jumlahPcs: totalAmbil, 
             operator: operator, 
-            dari: `${item.rack} - ${item.pallet}`, 
+            tujuan: tujuan, 
+            keterangan: `Dari ${item.rack} - ${item.pallet}`, 
             tanggal: new Date().toLocaleString('id-ID') 
         });
 
@@ -802,8 +950,8 @@
     }
     
     function bersihkanRiwayat() { 
-        if(currentUserRole !== 'admin') return alert("Akses Ditolak! Anda tidak bisa menghapus riwayat keluar.");
-        if(confirm("Hapus semua riwayat keluar?")) { 
+        if(currentUserRole !== 'admin') return alert("Akses Ditolak! Anda tidak bisa menghapus riwayat.");
+        if(confirm("Hapus semua riwayat aktivitas?")) { 
             db.ref('riwayat').remove();
         } 
     }
@@ -819,7 +967,7 @@
         if (!currentUserRole) return;
         
         let searchPerm = document.getElementById('searchPermintaan').value.toLowerCase();
-        let filteredPerm = permintaan.filter(p => p.peminta.toLowerCase().includes(searchPerm) || p.items.some(i => i.item.toLowerCase().includes(searchPerm)));
+        let filteredPerm = permintaan.filter(p => p.peminta.toLowerCase().includes(searchPerm) || p.items.some(i => i.item.toLowerCase().includes(searchPerm) || (i.code && i.code.toLowerCase().includes(searchPerm))));
         let pending = permintaan.filter(p => p.status === 'pending').length;
         document.getElementById('tabBtnPermintaan').innerHTML = pending > 0 ? `📝 Permintaan <span style="background:#ef4444; color:white; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:bold;">${pending}</span>` : `📝 Permintaan`;
         
@@ -839,11 +987,16 @@
                 let actionBtnText = isDone ? '<span style="font-size:1.2rem;">✅</span>' : `<button onclick="selesaikanPermintaanByKey('${p._key}')" style="background:#10b981; width:auto; padding:6px 14px; font-size:12px;">✅ Selesai</button>`;
                 let deleteButtonHtml = currentUserRole === 'admin' ? `<button onclick="hapusPermintaanByKey('${p._key}')" style="background:#ef4444; width:auto; padding:6px 14px; font-size:12px;">❌</button>` : '';
 
+                let itemListText = p.items.map(i => {
+                    let codeText = i.code && i.code !== '-' ? ` <small style="color:#6366f1;">[${i.code}]</small>` : '';
+                    return `${i.item}${codeText} (${i.qty} ${i.unit})`;
+                }).join(', ');
+
                 pContainer.innerHTML += `
                     <div class="item-row" style="flex-direction:row; justify-content:space-between; align-items:center; background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:8px; border:1px solid #e2e8f0;">
                         <span>
                             <b>Departemen: ${p.departemen}</b><br>
-                            Permintaan: ${p.items.map(i=>i.item+' ('+i.qty+' '+i.unit+')').join(', ')}<br>
+                            Permintaan: ${itemListText}<br>
                             <small style="color:#64748b;">📅 Tanggal: ${p.tanggal || '-'}</small>
                         </span>
                         <div style="display:flex; gap:5px;" class="no-print">
@@ -855,13 +1008,46 @@
             });
         });
 
+        // RENDER RIWAYAT
         let searchR = document.getElementById('searchRiwayat').value.toLowerCase();
-        let rContainer = document.getElementById('riwayatContainer'); rContainer.innerHTML = '';
-        let filteredRiwayat = riwayat.filter(r => r.item.toLowerCase().includes(searchR));
-        let operators = [...new Set(filteredRiwayat.map(r => r.operator))];
+        let filterTipe = document.getElementById('filterTipeRiwayat').value;
+        let rContainer = document.getElementById('riwayatContainer'); 
+        rContainer.innerHTML = '';
+
+        let filteredRiwayat = riwayat.filter(r => {
+            let itemCode = r.code ? r.code.toLowerCase() : '';
+            let itemName = r.item ? r.item.toLowerCase() : '';
+            let operatorName = r.operator ? r.operator.toLowerCase() : '';
+            let matchesSearch = itemName.includes(searchR) || itemCode.includes(searchR) || operatorName.includes(searchR);
+            let rType = r.type || 'keluar';
+            let matchesType = (filterTipe === "") ? true : (rType === filterTipe);
+            return matchesSearch && matchesType;
+        });
+
+        let operators = [...new Set(filteredRiwayat.map(r => r.operator || 'Sistem'))];
         operators.forEach(op => {
             rContainer.innerHTML += `<div style="font-weight:bold; margin-top:20px; color:#8b5cf6; border-bottom:2px solid #8b5cf6; padding-bottom:5px;">👤 Operator: ${op}</div>`;
-            rContainer.innerHTML += filteredRiwayat.filter(r => r.operator === op).map(r => `<div style="display:grid; grid-template-columns:2fr 1fr 2fr; padding:10px; background:#f8fafc; font-size:0.9rem;"><div><b>${r.item}</b></div><div>${r.jumlahDisplay}</div><div style="color:#64748b;">📍 ${r.dari}<br>${r.tanggal}</div></div>`).join('');
+            rContainer.innerHTML += filteredRiwayat.filter(r => (r.operator || 'Sistem') === op).map(r => {
+                let typeBadge = '';
+                let rType = r.type || 'keluar';
+                if(rType === 'masuk') {
+                    typeBadge = `<span class="badge-type badge-masuk">📥 MASUK</span>`;
+                } else if(rType === 'pindah') {
+                    typeBadge = `<span class="badge-type badge-pindah">🚚 PINDAH</span>`;
+                } else {
+                    typeBadge = `<span class="badge-type badge-keluar">📤 KELUAR</span>`;
+                }
+
+                let codeDisplay = (r.code && r.code !== '-') ? `<br><small style="color:#6366f1;">Kode: ${r.code}</small>` : '';
+                let ketText = r.keterangan || (r.dari ? `Dari ${r.dari}` : '-');
+                let tujuanText = r.tujuan ? `<br><span style="color:#ef4444; font-weight:600;">🎯 Tujuan: ${r.tujuan}</span>` : '';
+
+                return `<div style="display:grid; grid-template-columns:2fr 1fr 2fr; padding:10px; background:#f8fafc; font-size:0.9rem; border-bottom:1px solid #e2e8f0; align-items:center;">
+                    <div>${typeBadge}<br><b>${r.item}</b>${codeDisplay}</div>
+                    <div>${r.jumlahDisplay}</div>
+                    <div style="color:#64748b;">📍 ${ketText}${tujuanText}<br><small>🕒 ${r.tanggal}</small></div>
+                </div>`;
+            }).join('');
         });
 
         document.getElementById('selectRack').innerHTML = '<option value="">Pilih Rak...</option>' + racks.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
@@ -871,9 +1057,23 @@
         const mContainer = document.getElementById('mainContainer'); mContainer.innerHTML = '';
         let totalStokPerItem = {};
 
+        // AKUMULASI TOTAL STOK DARI MASTER STOK
+        stok.forEach(it => {
+            if (!totalStokPerItem[it.item]) {
+                totalStokPerItem[it.item] = { code: it.code || '-', totalPcs: 0, unit: it.unit, isi: it.isiPerUnit, limitStok: it.limitStok || 0, lokasi: [] };
+            }
+            totalStokPerItem[it.item].totalPcs += it.totalPcs;
+            totalStokPerItem[it.item].lokasi.push(`${it.rack} - ${it.pallet}`);
+            if (it.limitStok > totalStokPerItem[it.item].limitStok) {
+                totalStokPerItem[it.item].limitStok = it.limitStok; // simpan limit tertinggi jika diatur
+            }
+        });
+
         if (search === "" && filterRackValue === "") {
             mContainer.innerHTML = `<div style="color:#94a3b8; text-align:center; padding:30px; border:2px dashed #cbd5e1; border-radius:12px;">Pilih rak atau cari barang untuk memuat data visual.</div>`;
-            renderTabelTotalStok({}); return;
+            renderTabelTotalStok(totalStokPerItem);
+            renderTabLimitBarang(totalStokPerItem);
+            return;
         }
 
         racks.forEach(r => {
@@ -909,8 +1109,9 @@
                     let infoDisplay = `${it.totalPcs} Pcs`; 
                     if(it.unit.toLowerCase() !== 'pcs') infoDisplay += ` (${Math.ceil(it.totalPcs/it.isiPerUnit)} ${it.unit})`;
                     let codeDisplay = it.code ? `<br><small style="color:#6366f1;">Kode: ${it.code}</small>` : '';
+                    let limitText = (it.limitStok > 0) ? `<br><small style="color:#ef4444; font-weight:600;">Limit Minimum: ${it.limitStok} Pcs</small>` : '';
 
-                    return `<div class="item-row"><div><b>${it.item}</b>${codeDisplay}<br><small style="color:#64748b;">Stok: ${infoDisplay}</small></div><div class="action-btns">${btnsHtml}</div></div>`;
+                    return `<div class="item-row"><div><b>${it.item}</b>${codeDisplay}<br><small style="color:#64748b;">Stok: ${infoDisplay}</small>${limitText}</div><div class="action-btns">${btnsHtml}</div></div>`;
                 }).join('');
 
                 let paginationHtml = "";
@@ -922,14 +1123,13 @@
                     paginationHtml = `<div class="pallet-pagination"><span style="font-size: 0.7rem; color:#64748b;">Hal:</span>${pageButtons}</div>`;
                 }
 
-                displayItems.forEach(it => {
-                    if (!totalStokPerItem[it.item]) totalStokPerItem[it.item] = { code: it.code || '-', totalPcs: 0, unit: it.unit, isi: it.isiPerUnit };
-                    totalStokPerItem[it.item].totalPcs += it.totalPcs;
-                });
-
                 finalPalletsHtml += `<div class="pallet-card"><div class="pallet-header"><span>📦 ${pName} <small style="font-weight:normal; color:#94a3b8;">(${totalItems} item)</small></span>${paginationHtml}</div><div style="flex-grow:1;">${itemsHtml}</div></div>`;
             }
-            if(finalPalletsHtml !== "") mContainer.insertAdjacentHTML('beforeend', `<div class="rack-section"><div class="rack-header-row"><h2 class="rack-title">${r.name}</h2><button class="btn-add-pallet-spec" onclick="tambahPalletKeRak('${r.name}')">➕ Pallet</button></div><div class="pallet-container">${finalPalletsHtml}</div></div>`);
+            
+            // Tombol Tambah Pallet hanya tampil untuk Admin
+            let btnAddPalletHtml = currentUserRole === 'admin' ? `<button class="btn-add-pallet-spec" onclick="tambahPalletKeRak('${r.name}')">➕ Pallet</button>` : '';
+
+            if(finalPalletsHtml !== "") mContainer.insertAdjacentHTML('beforeend', `<div class="rack-section"><div class="rack-header-row"><h2 class="rack-title">${r.name}</h2>${btnAddPalletHtml}</div><div class="pallet-container">${finalPalletsHtml}</div></div>`);
         });
         
         if (mContainer.innerHTML === "" && filterRackValue !== "") {
@@ -937,6 +1137,7 @@
         }
 
         renderTabelTotalStok(totalStokPerItem);
+        renderTabLimitBarang(totalStokPerItem);
     }
 
     function renderTabelTotalStok(dataTotal) {
@@ -948,24 +1149,118 @@
             let item = dataTotal[name];
             let konversiSatuan = `${item.totalPcs} Pcs`;
             if(item.unit.toLowerCase() !== 'pcs') konversiSatuan += ` (${Math.ceil(item.totalPcs / item.isi)} ${item.unit})`;
-            return `<tr><td>${idx + 1}</td><td><b>${name}</b></td><td><span style="color:#6366f1; font-weight:600;">${item.code}</span></td><td><b>${konversiSatuan}</b></td></tr>`;
+            let limitDisplay = item.limitStok > 0 ? `${item.limitStok} Pcs` : '-';
+            return `<tr><td>${idx + 1}</td><td><b>${name}</b></td><td><span style="color:#6366f1; font-weight:600;">${item.code}</span></td><td><b>${konversiSatuan}</b></td><td><span style="color:#ef4444; font-weight:600;">${limitDisplay}</span></td></tr>`;
         }).join('');
 
-        container.innerHTML = `<table class="total-stock-table"><thead><tr><th style="width:5%;">No</th><th>Nama Barang</th><th>Kode Barang</th><th>Total Akumulasi Stok</th></tr></thead><tbody>${tableRows}</tbody></table>`;
+        container.innerHTML = `<table class="total-stock-table"><thead><tr><th style="width:5%;">No</th><th>Nama Barang</th><th>Kode Barang</th><th>Total Akumulasi Stok</th><th>Limit Min</th></tr></thead><tbody>${tableRows}</tbody></table>`;
+    }
+
+    function renderTabLimitBarang(dataTotal) {
+        const container = document.getElementById('barangLimitContainer');
+        const tabBtn = document.getElementById('tabBtnLimit');
+        
+        // Filter barang yang limit-nya ditetapkan (> 0) DAN stoknya <= limit
+        let itemsMencapaiLimit = [];
+        Object.keys(dataTotal).forEach(name => {
+            let it = dataTotal[name];
+            if (it.limitStok > 0 && it.totalPcs <= it.limitStok) {
+                itemsMencapaiLimit.push({ name: name, ...it });
+            }
+        });
+
+        // Tampilkan Badge Notifikasi di Tab
+        if (itemsMencapaiLimit.length > 0) {
+            tabBtn.innerHTML = `⚠️ Barang Limit <span style="background:#ef4444; color:white; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:bold;">${itemsMencapaiLimit.length}</span>`;
+        } else {
+            tabBtn.innerHTML = `⚠️ Barang Limit`;
+        }
+
+        if (itemsMencapaiLimit.length === 0) {
+            container.innerHTML = `<div style="color:#10b981; text-align:center; padding:30px; border:2px dashed #a7f3d0; background:#ecfdf5; border-radius:12px; font-weight:bold;">✅ Semua barang aman! Tidak ada stok barang yang mencapai atau di bawah limit minimum.</div>`;
+            return;
+        }
+
+        let tableRows = itemsMencapaiLimit.map((item, idx) => {
+            let konversiSatuan = `${item.totalPcs} Pcs`;
+            if(item.unit.toLowerCase() !== 'pcs') konversiSatuan += ` (${Math.ceil(item.totalPcs / item.isi)} ${item.unit})`;
+            let statusBadge = item.totalPcs === 0 ? `<span style="background:#ef4444; color:white; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold;">HABIS</span>` : `<span style="background:#f59e0b; color:white; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold;">CRITICAL</span>`;
+            
+            let lokasiUnique = [...new Set(item.lokasi)].join(', ');
+
+            return `<tr>
+                <td style="text-align:center;">${idx + 1}</td>
+                <td><b>${item.name}</b></td>
+                <td><span style="color:#6366f1; font-weight:600;">${item.code}</span></td>
+                <td><b style="color:#ef4444;">${konversiSatuan}</b></td>
+                <td style="font-weight:bold; color:#f59e0b;">${item.limitStok} Pcs</td>
+                <td><small style="color:#64748b;">${lokasiUnique || '-'}</small></td>
+                <td style="text-align:center;">${statusBadge}</td>
+            </tr>`;
+        }).join('');
+
+        container.innerHTML = `
+            <table class="total-stock-table">
+                <thead>
+                    <tr>
+                        <th style="width:5%;">No</th>
+                        <th>Nama Barang</th>
+                        <th>Kode</th>
+                        <th>Sisa Stok Saat Ini</th>
+                        <th>Batas Limit</th>
+                        <th>Lokasi Terakhir</th>
+                        <th style="text-align:center;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+        `;
     }
 
     function exportStokExcel() {
-        let dataMap = stok.map((s, i) => ({"No": i + 1, "Nama Barang": s.item, "Kode Barang": s.code || "-", "Jumlah Satuan": s.qty, "Satuan": s.unit, "Isi Per Satuan": s.isiPerUnit, "Total (Pcs)": s.totalPcs, "Lokasi Rak": s.rack, "Lokasi Pallet": s.pallet}));
+        let dataMap = stok.map((s, i) => ({"No": i + 1, "Nama Barang": s.item, "Kode Barang": s.code || "-", "Jumlah Satuan": s.qty, "Satuan": s.unit, "Isi Per Satuan": s.isiPerUnit, "Limit Minimum (Pcs)": s.limitStok || 0, "Total (Pcs)": s.totalPcs, "Lokasi Rak": s.rack, "Lokasi Pallet": s.pallet}));
         let ws = XLSX.utils.json_to_sheet(dataMap); let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Stok Gudang"); XLSX.writeFile(wb, "Data_Stok_Gudang.xlsx");
     }
+
+    function exportLimitExcel() {
+        let totalStokPerItem = {};
+        stok.forEach(it => {
+            if (!totalStokPerItem[it.item]) {
+                totalStokPerItem[it.item] = { code: it.code || '-', totalPcs: 0, unit: it.unit, isi: it.isiPerUnit, limitStok: it.limitStok || 0 };
+            }
+            totalStokPerItem[it.item].totalPcs += it.totalPcs;
+            if (it.limitStok > totalStokPerItem[it.item].limitStok) totalStokPerItem[it.item].limitStok = it.limitStok;
+        });
+
+        let dataMap = [];
+        let no = 1;
+        Object.keys(totalStokPerItem).forEach(name => {
+            let it = totalStokPerItem[name];
+            if (it.limitStok > 0 && it.totalPcs <= it.limitStok) {
+                dataMap.push({
+                    "No": no++,
+                    "Nama Barang": name,
+                    "Kode Barang": it.code,
+                    "Sisa Total (Pcs)": it.totalPcs,
+                    "Batas Limit (Pcs)": it.limitStok,
+                    "Status": it.totalPcs === 0 ? "STOK HABIS" : "MENDEKATI LIMIT"
+                });
+            }
+        });
+
+        if(dataMap.length === 0) return alert("Tidak ada data barang limit untuk diexport.");
+
+        let ws = XLSX.utils.json_to_sheet(dataMap); let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Barang Limit"); XLSX.writeFile(wb, "Data_Barang_Limit.xlsx");
+    }
+
     function exportPermintaanExcel() {
         let dataMap = []; let no = 1;
-        permintaan.forEach(p => { p.items.forEach(item => { dataMap.push({"No": no++, "Tanggal": p.tanggal, "Nama": p.peminta, "Departemen": p.departemen || "-", "Nama Barang": item.item, "Jumlah": item.qty, "Satuan": item.unit, "Total Pcs": item.totalPcs, "Status": p.status === 'done' ? 'Selesai' : 'Pending', "Operator": p.operator || "-"}); }); });
+        permintaan.forEach(p => { p.items.forEach(item => { dataMap.push({"No": no++, "Tanggal": p.tanggal, "Nama": p.peminta, "Departemen": p.departemen || "-", "Kode Barang": item.code || "-", "Nama Barang": item.item, "Jumlah": item.qty, "Satuan": item.unit, "Total Pcs": item.totalPcs, "Status": p.status === 'done' ? 'Selesai' : 'Pending', "Operator": p.operator || "-"}); }); });
         let ws = XLSX.utils.json_to_sheet(dataMap); let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Permintaan"); XLSX.writeFile(wb, "Data_Permintaan_Barang.xlsx");
     }
     function exportRiwayatExcel() {
-        let dataMap = riwayat.map((r, i) => ({"No": i + 1, "Tanggal & Waktu": r.tanggal, "Nama Barang": r.item, "Jumlah Pengambilan": r.jumlahDisplay, "Total (Pcs)": r.jumlahPcs, "Asal Lokasi": r.dari, "Operator": r.operator}));
-        let ws = XLSX.utils.json_to_sheet(dataMap); let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Riwayat Keluar"); XLSX.writeFile(wb, "Data_Riwayat_Keluar.xlsx");
+        let dataMap = riwayat.map((r, i) => ({"No": i + 1, "Tanggal & Waktu": r.tanggal, "Tipe": (r.type || 'keluar').toUpperCase(), "Kode Barang": r.code || "-", "Nama Barang": r.item, "Jumlah": r.jumlahDisplay, "Total (Pcs)": r.jumlahPcs, "Tujuan": r.tujuan || "-", "Keterangan": r.keterangan || r.dari || "-", "Operator": r.operator}));
+        let ws = XLSX.utils.json_to_sheet(dataMap); let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Riwayat Aktivitas"); XLSX.writeFile(wb, "Data_Riwayat_Aktivitas.xlsx");
     }
 
     populateUnitDropdowns();
