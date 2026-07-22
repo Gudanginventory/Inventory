@@ -6,6 +6,11 @@
     <title>Gudang Inventory Pro</title>
     <!-- Pustaka SheetJS untuk Fitur Export Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- PUSTAKA FIREBASE (COMPAT BUILD) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
     <style>
         :root { 
             --primary: #8b5cf6; --bg: #f8fafc; --text-main: #1e293b; --border: #e2e8f0; 
@@ -259,7 +264,15 @@
 <div id="pindahModal" class="modal"><div class="modal-content"><h3>🚚 Pindah Lokasi Barang</h3><p id="pindahBarangInfo" style="font-weight: 600; font-size: 0.95rem; color: #4f46e5; margin-bottom: 15px;"></p><label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Rak Tujuan:</label><select id="pindahRack" onchange="updatePindahPalletDropdown()" style="margin-bottom: 15px; margin-top: 5px;"></select><label style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Pilih Pallet Tujuan:</label><select id="pindahPallet" style="margin-bottom: 20px; margin-top: 5px;"></select><div style="display: flex; gap: 10px;"><button onclick="prosesPindah()" style="background:#10b981; flex:1;">Pindahkan</button><button onclick="closeModal('pindahModal')" style="background:#64748b; flex:1;">Batal</button></div></div></div>
 
 <script>
-    // Konfigurasi Kredensial Akses Aplikasi
+    // ================= KONFIGURASI FIREBASE REALTIME DATABASE =================
+    const firebaseConfig = {
+        databaseURL: "https://gudang-db160-default-rtdb.asia-southeast1.firebasedatabase.app/"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Kredensial Akses Aplikasi
     const ROLE_PASSWORDS = {
         admin: "admin123",
         gudang: "gudang123",
@@ -269,19 +282,62 @@
     let currentUserRole = sessionStorage.getItem('gudang_role') || null;
 
     let defaultRacks = [ { name: "Rak A", palletCount: 5 }, { name: "Rak B", palletCount: 5 } ];
-    let racks = JSON.parse(localStorage.getItem('gudang_racks'));
-    if (!racks || racks.length === 0) { racks = defaultRacks; localStorage.setItem('gudang_racks', JSON.stringify(racks)); }
-
     let defaultUnits = ["Pcs", "Dus", "Ikat", "Box", "Pack"];
-    let customUnits = JSON.parse(localStorage.getItem('gudang_units'));
-    if (!customUnits || customUnits.length === 0) { customUnits = defaultUnits; localStorage.setItem('gudang_units', JSON.stringify(customUnits)); }
 
-    let stok = JSON.parse(localStorage.getItem('gudang_stok')) || [];
-    let riwayat = JSON.parse(localStorage.getItem('gudang_riwayat')) || [];
-    let permintaan = JSON.parse(localStorage.getItem('gudang_permintaan')) || [];
+    let racks = defaultRacks;
+    let customUnits = defaultUnits;
+    let stok = [];
+    let riwayat = [];
+    let permintaan = [];
     let draftItems = [];
-    let currentIdx = null;
+    let currentFirebaseKey = null;
     let palletPages = {};
+
+    // SINKRONISASI REALTIME DARI FIREBASE DATABASE
+    db.ref('racks').on('value', snapshot => {
+        let val = snapshot.val();
+        racks = val ? Object.values(val) : defaultRacks;
+        renderAll();
+    });
+
+    db.ref('units').on('value', snapshot => {
+        let val = snapshot.val();
+        customUnits = val ? Object.values(val) : defaultUnits;
+        populateUnitDropdowns();
+    });
+
+    db.ref('stok').on('value', snapshot => {
+        let val = snapshot.val();
+        stok = [];
+        if(val) {
+            Object.keys(val).forEach(key => {
+                stok.push({ _key: key, ...val[key] });
+            });
+        }
+        renderAll();
+    });
+
+    db.ref('riwayat').on('value', snapshot => {
+        let val = snapshot.val();
+        riwayat = [];
+        if(val) {
+            Object.keys(val).forEach(key => {
+                riwayat.push({ _key: key, ...val[key] });
+            });
+        }
+        renderAll();
+    });
+
+    db.ref('permintaan').on('value', snapshot => {
+        let val = snapshot.val();
+        permintaan = [];
+        if(val) {
+            Object.keys(val).forEach(key => {
+                permintaan.push({ _key: key, ...val[key] });
+            });
+        }
+        renderAll();
+    });
 
     document.getElementById('operatorInput').value = localStorage.getItem('gudang_operator') || '';
     function saveOperator(val) { localStorage.setItem('gudang_operator', val); }
@@ -301,7 +357,6 @@
     }
     window.addEventListener('online', updateConnectionStatus); window.addEventListener('offline', updateConnectionStatus); updateConnectionStatus();
 
-    // Fungsi Toggle Visibilitas Password
     function togglePasswordVisibility(inputId, iconEl) {
         const passwordInput = document.getElementById(inputId);
         if (passwordInput.type === "password") {
@@ -313,7 +368,6 @@
         }
     }
 
-    // ================= SINKRONISASI MANAJEMEN ROLE & AKSES TAB =================
     function cekSessionLogin() {
         if (currentUserRole) {
             document.getElementById('loginScreen').style.display = 'none';
@@ -395,12 +449,11 @@
     function setPalletPage(rackName, palletName, pageNum) { palletPages[`${rackName}-${palletName}`] = pageNum; renderAll(); }
 
     function tambahPalletKeRak(rackName) {
-        const rack = racks.find(r => r.name === rackName);
-        if (rack) {
-            rack.palletCount += 1;
-            localStorage.setItem('gudang_racks', JSON.stringify(racks));
-            renderAll();
-            alert(`Berhasil menambahkan "Pallet ${rack.palletCount}" ke dalam ${rackName}!`);
+        const rackIndex = racks.findIndex(r => r.name === rackName);
+        if (rackIndex !== -1) {
+            racks[rackIndex].palletCount += 1;
+            db.ref('racks').set(racks);
+            alert(`Berhasil menambahkan "Pallet ${racks[rackIndex].palletCount}" ke dalam ${rackName}!`);
         }
     }
 
@@ -409,16 +462,10 @@
         const count = parseInt(document.getElementById('inputJmlPallet').value);
         if(!name || !count) return alert("Isi data rak dengan lengkap!");
         racks.push({ name, palletCount: count });
-        localStorage.setItem('gudang_racks', JSON.stringify(racks));
+        db.ref('racks').set(racks);
         document.getElementById('inputNamaRak').value = '';
         document.getElementById('inputJmlPallet').value = '';
-        
-        const currentFilter = document.getElementById('filterRack').value;
-        document.getElementById('filterRack').innerHTML = '<option value="">📁 Semua Rak...</option>' + racks.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
-        document.getElementById('filterRack').value = currentFilter;
-
         toggleForm('rackForm');
-        renderAll();
     }
 
     function simpanSatuanBaru() {
@@ -428,11 +475,10 @@
         if(exists) return alert("Satuan tersebut sudah terdaftar!");
         satuanBaru = satuanBaru.charAt(0).toUpperCase() + satuanBaru.slice(1);
         customUnits.push(satuanBaru);
-        localStorage.setItem('gudang_units', JSON.stringify(customUnits));
+        db.ref('units').set(customUnits);
         document.getElementById('inputSatuanBaru').value = '';
         toggleForm('unitForm');
-        populateUnitDropdowns();
-        alert(`Satuan "${satuanBaru}" berhasil ditambahkan secara permanen!`);
+        alert(`Satuan "${satuanBaru}" berhasil ditambahkan!`);
     }
 
     function populateUnitDropdowns() {
@@ -497,32 +543,31 @@
         const peminta = document.getElementById('reqNamaPeminta').value;
         const departemen = document.getElementById('reqDepartemen').value || "-";
         if(!peminta) return alert("Isi Nama terlebih dahulu!");
-        permintaan.push({ peminta, departemen, items: draftItems, tanggal: new Date().toLocaleDateString('id-ID'), status: 'pending', operator: '' });
-        localStorage.setItem('gudang_permintaan', JSON.stringify(permintaan));
+        
+        db.ref('permintaan').push({ 
+            peminta, departemen, items: draftItems, tanggal: new Date().toLocaleDateString('id-ID'), status: 'pending', operator: '' 
+        });
+
         draftItems = [];
         document.getElementById('reqNamaPeminta').value = '';
         document.getElementById('reqDepartemen').value = '';
-        renderDraft(); renderAll();
+        renderDraft();
         alert("Permintaan berhasil dikirim!");
     }
 
-    function selesaikanPermintaan(idx) {
+    function selesaikanPermintaanByKey(key) {
         let op = localStorage.getItem('gudang_operator');
         if(currentUserRole !== 'admin' && currentUserRole !== 'gudang') { return alert("Anda tidak memiliki hak akses untuk menyelesaikan permintaan."); }
         if(!op || op.trim() === "") { return alert("Wajib mengisi 'Nama Operator' di bagian atas halaman sebelum menyelesaikan permintaan!"); }
-        permintaan[idx].status = 'done';
-        permintaan[idx].operator = op; 
-        localStorage.setItem('gudang_permintaan', JSON.stringify(permintaan));
-        renderAll();
+        
+        db.ref('permintaan/' + key).update({ status: 'done', operator: op });
         alert(`Permintaan diselesaikan oleh: ${op}`);
     }
 
-    function hapusPermintaan(idx) {
+    function hapusPermintaanByKey(key) {
         if(currentUserRole !== 'admin') return alert("Hanya admin yang dapat menghapus data permintaan terkirim!");
         if(confirm("Apakah Anda yakin ingin menghapus permintaan ini dari daftar?")) {
-            permintaan.splice(idx, 1);
-            localStorage.setItem('gudang_permintaan', JSON.stringify(permintaan));
-            renderAll();
+            db.ref('permintaan/' + key).remove();
         }
     }
 
@@ -559,7 +604,6 @@
         window.print();
     }
 
-    // Cetak Rekap Hari Ini
     function cetakRekapHariIniSemuaPeminta() {
         const today = new Date().toLocaleDateString('id-ID');
         const reqsToday = permintaan.filter(p => p.tanggal === today);
@@ -647,48 +691,76 @@
         const rack = document.getElementById('selectRack').value;
         const pallet = document.getElementById('selectPallet').value;
         if(!item || isNaN(qty) || !unit || !rack || !pallet) return alert("Lengkapi data barang, jumlah, rak, dan pallet!");
+        
         let multiplier = (unit.toLowerCase() !== 'pcs') ? isi : 1;
-        stok.push({ item, code, qty, unit, isiPerUnit: isi, totalPcs: qty * multiplier, rack, pallet });
-        localStorage.setItem('gudang_stok', JSON.stringify(stok));
-        document.getElementById('inputNamaBarang').value = ''; document.getElementById('inputKodeBarang').value = ''; document.getElementById('inputQty').value = '';
-        renderAll();
+        db.ref('stok').push({ item, code, qty, unit, isiPerUnit: isi, totalPcs: qty * multiplier, rack, pallet });
+        
+        document.getElementById('inputNamaBarang').value = ''; 
+        document.getElementById('inputKodeBarang').value = ''; 
+        document.getElementById('inputQty').value = '';
     }
     
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    function openAmbilModal(idx) { currentIdx = idx; document.getElementById('ambilModal').style.display = 'flex'; document.getElementById('operatorAmbilModal').value = localStorage.getItem('gudang_operator') || ''; }
     
-    function openEditModal(idx) {
-        currentIdx = idx; let item = stok[idx];
-        document.getElementById('editNama').value = item.item; document.getElementById('editKode').value = item.code || ''; 
-        document.getElementById('editQty').value = item.qty; document.getElementById('editUnit').value = item.unit; document.getElementById('editIsi').value = item.isiPerUnit;
+    function openAmbilModalByKey(key) { 
+        currentFirebaseKey = key; 
+        document.getElementById('ambilModal').style.display = 'flex'; 
+        document.getElementById('operatorAmbilModal').value = localStorage.getItem('gudang_operator') || ''; 
+    }
+    
+    function openEditModalByKey(key) {
+        currentFirebaseKey = key; 
+        let item = stok.find(s => s._key === key);
+        if(!item) return;
+        document.getElementById('editNama').value = item.item; 
+        document.getElementById('editKode').value = item.code || ''; 
+        document.getElementById('editQty').value = item.qty; 
+        document.getElementById('editUnit').value = item.unit; 
+        document.getElementById('editIsi').value = item.isiPerUnit;
         document.getElementById('editRack').innerHTML = racks.map(r => `<option value="${r.name}" ${r.name === item.rack ? 'selected' : ''}>${r.name}</option>`).join('');
-        updateEditPalletDropdown(); document.getElementById('editPallet').value = item.pallet;
+        updateEditPalletDropdown(); 
+        document.getElementById('editPallet').value = item.pallet;
         document.getElementById('editModal').style.display = 'flex';
     }
 
     function saveEdit() {
-        let item = stok[currentIdx];
-        item.item = document.getElementById('editNama').value; item.code = document.getElementById('editKode').value;
-        item.qty = parseInt(document.getElementById('editQty').value); item.unit = document.getElementById('editUnit').value;
-        item.isiPerUnit = parseInt(document.getElementById('editIsi').value) || 1; item.rack = document.getElementById('editRack').value; item.pallet = document.getElementById('editPallet').value;
-        item.totalPcs = item.qty * ((item.unit.toLowerCase() !== 'pcs') ? item.isiPerUnit : 1);
-        localStorage.setItem('gudang_stok', JSON.stringify(stok));
-        renderAll(); closeModal('editModal');
+        let key = currentFirebaseKey;
+        let item = stok.find(s => s._key === key);
+        if(!item) return;
+
+        let editNama = document.getElementById('editNama').value;
+        let editKode = document.getElementById('editKode').value;
+        let editQty = parseInt(document.getElementById('editQty').value);
+        let editUnit = document.getElementById('editUnit').value;
+        let editIsi = parseInt(document.getElementById('editIsi').value) || 1;
+        let editRack = document.getElementById('editRack').value;
+        let editPallet = document.getElementById('editPallet').value;
+        let totalPcs = editQty * ((editUnit.toLowerCase() !== 'pcs') ? editIsi : 1);
+
+        db.ref('stok/' + key).update({
+            item: editNama, code: editKode, qty: editQty, unit: editUnit, isiPerUnit: editIsi, rack: editRack, pallet: editPallet, totalPcs: totalPcs
+        });
+
+        closeModal('editModal');
     }
 
-    function openPindahModal(idx) {
-        currentIdx = idx; let item = stok[idx];
+    function openPindahModalByKey(key) {
+        currentFirebaseKey = key; 
+        let item = stok.find(s => s._key === key);
+        if(!item) return;
         document.getElementById('pindahBarangInfo').innerText = `${item.item} (Asal: ${item.rack} - ${item.pallet})`;
         document.getElementById('pindahRack').innerHTML = racks.map(r => `<option value="${r.name}" ${r.name === item.rack ? 'selected' : ''}>${r.name}</option>`).join('');
-        updatePindahPalletDropdown(); document.getElementById('pindahPallet').value = item.pallet;
+        updatePindahPalletDropdown(); 
+        document.getElementById('pindahPallet').value = item.pallet;
         document.getElementById('pindahModal').style.display = 'flex';
     }
 
     function prosesPindah() {
-        let item = stok[currentIdx];
-        item.rack = document.getElementById('pindahRack').value; item.pallet = document.getElementById('pindahPallet').value;
-        localStorage.setItem('gudang_stok', JSON.stringify(stok));
-        closeModal('pindahModal'); renderAll();
+        let key = currentFirebaseKey;
+        let rack = document.getElementById('pindahRack').value;
+        let pallet = document.getElementById('pindahPallet').value;
+        db.ref('stok/' + key).update({ rack, pallet });
+        closeModal('pindahModal');
     }
     
     function prosesAmbil() {
@@ -696,23 +768,44 @@
         if(!operator || operator.trim() === "") return alert("Nama Operator wajib diisi!");
         let ambil = parseInt(document.getElementById('qtyAmbil').value);
         let unit = document.getElementById('unitAmbil').value;
-        let item = stok[currentIdx];
+        
+        let item = stok.find(s => s._key === currentFirebaseKey);
+        if(!item) return;
+
         let totalAmbil = ambil * ((unit.toLowerCase() !== 'pcs') ? item.isiPerUnit : 1);
         if(totalAmbil > item.totalPcs) return alert("Stok tidak mencukupi!");
-        riwayat.push({ item: item.item, jumlahDisplay: `${ambil} ${unit}`, jumlahPcs: totalAmbil, operator: operator, dari: `${item.rack} - ${item.pallet}`, tanggal: new Date().toLocaleString('id-ID') });
-        localStorage.setItem('gudang_riwayat', JSON.stringify(riwayat));
-        item.totalPcs -= totalAmbil; if (item.totalPcs <= 0) stok.splice(currentIdx, 1);
-        localStorage.setItem('gudang_stok', JSON.stringify(stok));
-        renderAll(); closeModal('ambilModal');
+
+        db.ref('riwayat').push({ 
+            item: item.item, 
+            jumlahDisplay: `${ambil} ${unit}`, 
+            jumlahPcs: totalAmbil, 
+            operator: operator, 
+            dari: `${item.rack} - ${item.pallet}`, 
+            tanggal: new Date().toLocaleString('id-ID') 
+        });
+
+        let sisaTotalPcs = item.totalPcs - totalAmbil;
+        if (sisaTotalPcs <= 0) {
+            db.ref('stok/' + item._key).remove();
+        } else {
+            db.ref('stok/' + item._key).update({ totalPcs: sisaTotalPcs });
+        }
+
+        closeModal('ambilModal');
     }
     
-    function hapusBarang(idx) { 
+    function hapusBarangByKey(key) { 
         if(currentUserRole !== 'admin') return alert("Hanya admin yang bisa menghapus item dari stok secara permanen!");
-        if(confirm("Apakah Anda yakin ingin menghapus item ini?")) { stok.splice(idx, 1); localStorage.setItem('gudang_stok', JSON.stringify(stok)); renderAll(); } 
+        if(confirm("Apakah Anda yakin ingin menghapus item ini?")) { 
+            db.ref('stok/' + key).remove();
+        } 
     }
+    
     function bersihkanRiwayat() { 
         if(currentUserRole !== 'admin') return alert("Akses Ditolak! Anda tidak bisa menghapus riwayat keluar.");
-        if(confirm("Hapus semua riwayat keluar?")) { riwayat = []; localStorage.setItem('gudang_riwayat', JSON.stringify(riwayat)); renderAll(); } 
+        if(confirm("Hapus semua riwayat keluar?")) { 
+            db.ref('riwayat').remove();
+        } 
     }
 
     function updateUnitForRequest() {
@@ -743,8 +836,8 @@
             userReqs.forEach(p => {
                 let actualIdx = permintaan.indexOf(p);
                 let isDone = p.status === 'done';
-                let actionBtnText = isDone ? '<span style="font-size:1.2rem;">✅</span>' : `<button onclick="selesaikanPermintaan(${actualIdx})" style="background:#10b981; width:auto; padding:6px 14px; font-size:12px;">✅ Selesai</button>`;
-                let deleteButtonHtml = currentUserRole === 'admin' ? `<button onclick="hapusPermintaan(${actualIdx})" style="background:#ef4444; width:auto; padding:6px 14px; font-size:12px;">❌</button>` : '';
+                let actionBtnText = isDone ? '<span style="font-size:1.2rem;">✅</span>' : `<button onclick="selesaikanPermintaanByKey('${p._key}')" style="background:#10b981; width:auto; padding:6px 14px; font-size:12px;">✅ Selesai</button>`;
+                let deleteButtonHtml = currentUserRole === 'admin' ? `<button onclick="hapusPermintaanByKey('${p._key}')" style="background:#ef4444; width:auto; padding:6px 14px; font-size:12px;">❌</button>` : '';
 
                 pContainer.innerHTML += `
                     <div class="item-row" style="flex-direction:row; justify-content:space-between; align-items:center; background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:8px; border:1px solid #e2e8f0;">
@@ -803,14 +896,14 @@
                 const paginatedItems = displayItems.slice(startIndex, startIndex + itemsPerPage);
 
                 let itemsHtml = paginatedItems.map(it => {
-                    let id = stok.indexOf(it);
+                    let key = it._key;
                     let btnsHtml = '';
                     if (currentUserRole === 'admin' || currentUserRole === 'gudang') {
                         btnsHtml = `
-                            <button class="btn-action btn-edit" onclick="openEditModal(${id})">✏️ Edit</button>
-                            <button class="btn-action btn-move" onclick="openPindahModal(${id})">🚚 Pindah</button>
-                            <button class="btn-action btn-take" onclick="openAmbilModal(${id})">📥 Ambil</button>
-                            ${currentUserRole === 'admin' ? `<button class="btn-action btn-delete" onclick="hapusBarang(${id})">❌ Hapus</button>` : ''}
+                            <button class="btn-action btn-edit" onclick="openEditModalByKey('${key}')">✏️ Edit</button>
+                            <button class="btn-action btn-move" onclick="openPindahModalByKey('${key}')">🚚 Pindah</button>
+                            <button class="btn-action btn-take" onclick="openAmbilModalByKey('${key}')">📥 Ambil</button>
+                            ${currentUserRole === 'admin' ? `<button class="btn-action btn-delete" onclick="hapusBarangByKey('${key}')">❌ Hapus</button>` : ''}
                         `;
                     }
                     let infoDisplay = `${it.totalPcs} Pcs`; 
