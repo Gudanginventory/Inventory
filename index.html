@@ -225,7 +225,7 @@
         <div id="mainContainer"></div>
 
         <!-- Total Stok Barang Kontainer Keseluruhan -->
-        <div class="card" style="margin-top: 30px;">
+        <div class="card" id="cardTotalStokContainer" style="margin-top: 30px; display: none;">
             <h3>📊 Total Stok Barang Kontainer Keseluruhan</h3>
             <div id="totalStokBarangContainer"></div>
         </div>
@@ -971,7 +971,20 @@
         let pending = permintaan.filter(p => p.status === 'pending').length;
         document.getElementById('tabBtnPermintaan').innerHTML = pending > 0 ? `📝 Permintaan <span style="background:#ef4444; color:white; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:bold;">${pending}</span>` : `📝 Permintaan`;
         
-        document.getElementById('reqNamaBarang').innerHTML = '<option value="">Pilih Barang dari Stok...</option>' + [...new Set(stok.map(s => s.item))].map(name => `<option value="${name}">${name}</option>`).join('');
+        // MENAMPILKAN KODE BARANG DAN NAMA BARANG DI DROPDOWN PILIHAN BARANG
+        let uniqueItemsMap = new Map();
+        stok.forEach(s => {
+            if (!uniqueItemsMap.has(s.item)) {
+                uniqueItemsMap.set(s.item, s.code || '-');
+            }
+        });
+
+        let optionsReqHtml = '<option value="">Pilih Barang dari Stok...</option>';
+        uniqueItemsMap.forEach((code, name) => {
+            let label = (code && code !== '-') ? `[${code}] ${name}` : name;
+            optionsReqHtml += `<option value="${name}">${label}</option>`;
+        });
+        document.getElementById('reqNamaBarang').innerHTML = optionsReqHtml;
         
         let pContainer = document.getElementById('permintaanContainer'); pContainer.innerHTML = '';
         let pemintas = [...new Set(filteredPerm.map(p => p.peminta))];
@@ -1059,6 +1072,11 @@
 
         // AKUMULASI TOTAL STOK DARI MASTER STOK
         stok.forEach(it => {
+            // Jika user mengetik kata kunci pencarian, filter akumulasi stok berdasarkan kata kunci tersebut
+            if (search !== "" && !(it.item.toLowerCase().includes(search) || (it.code && it.code.toLowerCase().includes(search)))) {
+                return;
+            }
+
             if (!totalStokPerItem[it.item]) {
                 totalStokPerItem[it.item] = { code: it.code || '-', totalPcs: 0, unit: it.unit, isi: it.isiPerUnit, limitStok: it.limitStok || 0, lokasi: [] };
             }
@@ -1071,7 +1089,7 @@
 
         if (search === "" && filterRackValue === "") {
             mContainer.innerHTML = `<div style="color:#94a3b8; text-align:center; padding:30px; border:2px dashed #cbd5e1; border-radius:12px;">Pilih rak atau cari barang untuk memuat data visual.</div>`;
-            renderTabelTotalStok(totalStokPerItem);
+            document.getElementById('cardTotalStokContainer').style.display = 'none'; // Sembunyikan jika tidak mencari
             renderTabLimitBarang(totalStokPerItem);
             return;
         }
@@ -1136,14 +1154,21 @@
             mContainer.innerHTML = `<div style="color:#94a3b8; text-align:center; padding:30px; border:2px dashed #cbd5e1; border-radius:12px;">Tidak ada barang yang tersimpan di <b>${filterRackValue}</b>.</div>`;
         }
 
-        renderTabelTotalStok(totalStokPerItem);
+        // Tampilkan tabel Total Stok HANYA JIKA input pencarian diisi
+        if (search !== "") {
+            document.getElementById('cardTotalStokContainer').style.display = 'block';
+            renderTabelTotalStok(totalStokPerItem);
+        } else {
+            document.getElementById('cardTotalStokContainer').style.display = 'none';
+        }
+
         renderTabLimitBarang(totalStokPerItem);
     }
 
     function renderTabelTotalStok(dataTotal) {
         const container = document.getElementById('totalStokBarangContainer');
         let keys = Object.keys(dataTotal);
-        if(keys.length === 0) { container.innerHTML = `<div style="color:#94a3b8; text-align:center; padding:15px; font-size:0.9rem;">Belum ada data barang. Silakan lakukan pencarian atau pilih filter rak.</div>`; return; }
+        if(keys.length === 0) { container.innerHTML = `<div style="color:#94a3b8; text-align:center; padding:15px; font-size:0.9rem;">Barang tidak ditemukan dalam pencarian.</div>`; return; }
         
         let tableRows = keys.map((name, idx) => {
             let item = dataTotal[name];
@@ -1162,8 +1187,22 @@
         
         // Filter barang yang limit-nya ditetapkan (> 0) DAN stoknya <= limit
         let itemsMencapaiLimit = [];
-        Object.keys(dataTotal).forEach(name => {
-            let it = dataTotal[name];
+        
+        // Akumulasi ulang dari stok asli untuk tab Limit agar tidak terpengaruh filter pencarian
+        let dataLimitFull = {};
+        stok.forEach(it => {
+            if (!dataLimitFull[it.item]) {
+                dataLimitFull[it.item] = { code: it.code || '-', totalPcs: 0, unit: it.unit, isi: it.isiPerUnit, limitStok: it.limitStok || 0, lokasi: [] };
+            }
+            dataLimitFull[it.item].totalPcs += it.totalPcs;
+            dataLimitFull[it.item].lokasi.push(`${it.rack} - ${it.pallet}`);
+            if (it.limitStok > dataLimitFull[it.item].limitStok) {
+                dataLimitFull[it.item].limitStok = it.limitStok;
+            }
+        });
+
+        Object.keys(dataLimitFull).forEach(name => {
+            let it = dataLimitFull[name];
             if (it.limitStok > 0 && it.totalPcs <= it.limitStok) {
                 itemsMencapaiLimit.push({ name: name, ...it });
             }
