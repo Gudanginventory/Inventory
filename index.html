@@ -443,7 +443,10 @@
             <div class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
                     <h3>📊 Rekap Akumulasi Stok Total Seluruh Gudang</h3>
-                    <input type="text" id="searchTabStokTotal" placeholder="🔍 Cari nama/kode barang..." oninput="renderAll()" style="padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; width:250px;">
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <input type="text" id="searchTabStokTotal" placeholder="🔍 Cari nama/kode barang..." oninput="renderAll()" style="padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; width:250px;">
+                        <button onclick="exportStokTotalExcel()" style="background:var(--success); color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:600; cursor:pointer;">📊 Export Excel</button>
+                    </div>
                 </div>
                 <div id="stokTotalTableTabContainer"></div>
             </div>
@@ -968,7 +971,12 @@
 
         function cetakSemuaUserHariIni(nama) {
             const today = new Date().toLocaleDateString('id-ID');
-            const userReqs = permintaan.filter(p => p.peminta === nama && p.tanggal === today);
+            const normNamaTarget = nama ? nama.toLowerCase().replace(/\s+/g, ' ').trim() : '';
+            const userReqs = permintaan.filter(p => {
+                let normPeminta = p.peminta ? p.peminta.toLowerCase().replace(/\s+/g, ' ').trim() : '';
+                return normPeminta === normNamaTarget && p.tanggal === today;
+            });
+
             if (userReqs.length === 0) return alert("Tidak ada permintaan untuk nama ini hari ini.");
             let allItems = [];
             userReqs.forEach(p => { p.items.forEach(item => { allItems.push({ ...item, departemen: p.departemen || '-', operator: p.status === 'done' ? p.operator : '-' }); }); });
@@ -990,15 +998,21 @@
             }
 
             const pemintaGroup = {};
+            
             reqsToday.forEach(p => {
-                if (!pemintaGroup[p.peminta]) {
-                    pemintaGroup[p.peminta] = {
-                        departemen: p.departemen || '-',
+                let rawNama = p.peminta ? p.peminta.trim() : 'Tanpa Nama';
+                let normKey = rawNama.toLowerCase().replace(/\s+/g, ' '); 
+
+                if (!pemintaGroup[normKey]) {
+                    pemintaGroup[normKey] = {
+                        displayName: rawNama,
+                        departemen: p.departemen ? p.departemen.trim() : '-',
                         items: []
                     };
                 }
+
                 p.items.forEach(item => {
-                    pemintaGroup[p.peminta].items.push({
+                    pemintaGroup[normKey].items.push({
                         item: item.item,
                         code: item.code || '-',
                         qty: item.qty,
@@ -1016,13 +1030,13 @@
                 </div>
             `;
 
-            Object.keys(pemintaGroup).forEach((nama, index) => {
-                const groupData = pemintaGroup[nama];
+            Object.keys(pemintaGroup).forEach((key, index) => {
+                const groupData = pemintaGroup[key];
 
                 htmlContent += `
                     <div style="margin-bottom: 25px; page-break-inside: avoid;">
                         <div style="display:flex; justify-content:space-between; font-weight: bold; font-size: 1.05rem; margin-bottom: 5px; color: #000; border-bottom: 1px solid #000; padding-bottom: 3px;">
-                            <span>${index + 1}. Nama: ${nama}</span>
+                            <span>${index + 1}. Nama: ${groupData.displayName}</span>
                             <span>Departemen: ${groupData.departemen}</span>
                         </div>
                         <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
@@ -1279,15 +1293,36 @@
             });
             document.getElementById('reqNamaBarang').innerHTML = optionsReqHtml;
             
-            // Render Permintaan
-            let pContainer = document.getElementById('permintaanContainer'); pContainer.innerHTML = '';
-            let pemintas = [...new Set(filteredPerm.map(p => p.peminta))];
-            
-            pemintas.forEach(nama => {
-                let userReqs = filteredPerm.filter(p => p.peminta === nama);
-                pContainer.innerHTML += `<div style="font-weight:bold; margin-top:20px; color:#8b5cf6; border-bottom:2px solid #8b5cf6; padding-bottom:5px; display:flex; justify-content:space-between; align-items:center;">
-                    <span>👤 Nama: ${nama}</span><button onclick="cetakSemuaUserHariIni('${nama}')" style="background:#6366f1; color:white; border:none; border-radius:4px; padding:4px 8px; font-size:11px; cursor:pointer;" class="no-print">🖨️ Cetak Rekap</button></div>`;
-                
+            // RENDER PERMINTAAN (Case-Insensitive & Auto-Group Spasi)
+            let pContainer = document.getElementById('permintaanContainer'); 
+            pContainer.innerHTML = '';
+
+            let groupMap = {};
+
+            filteredPerm.forEach(p => {
+                let rawNama = p.peminta ? p.peminta.trim() : 'Tanpa Nama';
+                let keyGroup = rawNama.toLowerCase().replace(/\s+/g, ' '); 
+
+                if (!groupMap[keyGroup]) {
+                    groupMap[keyGroup] = {
+                        displayName: rawNama, 
+                        requests: []
+                    };
+                }
+                groupMap[keyGroup].requests.push(p);
+            });
+
+            Object.keys(groupMap).forEach(key => {
+                let group = groupMap[key];
+                let namaDisplay = group.displayName;
+                let userReqs = group.requests;
+
+                pContainer.innerHTML += `
+                    <div style="font-weight:bold; margin-top:20px; color:#8b5cf6; border-bottom:2px solid #8b5cf6; padding-bottom:5px; display:flex; justify-content:space-between; align-items:center;">
+                        <span>👤 Nama: ${namaDisplay}</span>
+                        <button onclick="cetakSemuaUserHariIni('${namaDisplay}')" style="background:#6366f1; color:white; border:none; border-radius:4px; padding:4px 8px; font-size:11px; cursor:pointer;" class="no-print">🖨️ Cetak Rekap</button>
+                    </div>`;
+
                 userReqs.forEach(p => {
                     let actualIdx = permintaan.indexOf(p);
                     let isDone = p.status === 'done';
@@ -1302,7 +1337,7 @@
                     pContainer.innerHTML += `
                         <div class="item-row" style="flex-direction:row; justify-content:space-between; align-items:center; background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:8px; border:1px solid #e2e8f0;">
                             <span>
-                                <b>Departemen: ${p.departemen}</b><br>
+                                <b>Departemen: ${p.departemen || '-'}</b><br>
                                 Permintaan: ${itemListText}<br>
                                 <small style="color:#64748b;">📅 Tanggal: ${p.tanggal || '-'}</small>
                             </span>
@@ -1315,7 +1350,7 @@
                 });
             });
 
-            // RENDER RIWAYAT
+            // RENDER RIWAYAT (Case-Insensitive Operator Grouping)
             let searchR = document.getElementById('searchRiwayat').value.toLowerCase();
             let filterTipe = document.getElementById('filterTipeRiwayat').value;
             let rContainer = document.getElementById('riwayatContainer'); 
@@ -1331,10 +1366,26 @@
                 return matchesSearch && matchesType;
             });
 
-            let operators = [...new Set(filteredRiwayat.map(r => r.operator || 'Sistem'))];
-            operators.forEach(op => {
-                rContainer.innerHTML += `<div style="font-weight:bold; margin-top:20px; color:#8b5cf6; border-bottom:2px solid #8b5cf6; padding-bottom:5px;">👤 Operator: ${op}</div>`;
-                rContainer.innerHTML += filteredRiwayat.filter(r => (r.operator || 'Sistem') === op).map(r => {
+            // Pengelompokan Operator Secara Case-Insensitive & Pembersihan Spasi
+            let operatorGroupMap = {};
+            filteredRiwayat.forEach(r => {
+                let rawOp = (r.operator && r.operator.trim() !== '') ? r.operator.trim() : 'Sistem';
+                let normKey = rawOp.toLowerCase().replace(/\s+/g, ' ');
+
+                if (!operatorGroupMap[normKey]) {
+                    operatorGroupMap[normKey] = {
+                        displayName: rawOp,
+                        items: []
+                    };
+                }
+                operatorGroupMap[normKey].items.push(r);
+            });
+
+            Object.keys(operatorGroupMap).forEach(normKey => {
+                let group = operatorGroupMap[normKey];
+                rContainer.innerHTML += `<div style="font-weight:bold; margin-top:20px; color:#8b5cf6; border-bottom:2px solid #8b5cf6; padding-bottom:5px;">👤 Operator: ${group.displayName}</div>`;
+                
+                rContainer.innerHTML += group.items.map(r => {
                     let typeBadge = '';
                     let rType = r.type || 'keluar';
                     if(rType === 'masuk') {
@@ -1549,6 +1600,56 @@
         function exportStokExcel() {
             let dataMap = stok.map((s, i) => ({"No": i + 1, "Nama Barang": s.item, "Kode Barang": s.code || "-", "Jumlah Satuan": s.qty, "Satuan": s.unit, "Isi Per Satuan": s.isiPerUnit, "Limit Minimum (Pcs)": s.limitStok || 0, "Total (Pcs)": s.totalPcs, "Lokasi Rak": s.rack, "Lokasi Pallet": s.pallet}));
             let ws = XLSX.utils.json_to_sheet(dataMap); let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Stok Gudang"); XLSX.writeFile(wb, "Data_Stok_Gudang.xlsx");
+        }
+
+        function exportStokTotalExcel() {
+            let totalStokPerItem = {};
+            stok.forEach(it => {
+                let keyStandard = it.item.trim().toLowerCase();
+                if (!totalStokPerItem[keyStandard]) {
+                    totalStokPerItem[keyStandard] = { 
+                        displayName: it.item.trim(), 
+                        code: it.code || '-', 
+                        totalPcs: 0, 
+                        unit: it.unit, 
+                        isi: it.isiPerUnit, 
+                        limitStok: it.limitStok || 0, 
+                        lokasi: [] 
+                    };
+                }
+                totalStokPerItem[keyStandard].totalPcs += it.totalPcs;
+                totalStokPerItem[keyStandard].lokasi.push(`${it.rack} - ${it.pallet}`);
+                if ((it.limitStok || 0) > totalStokPerItem[keyStandard].limitStok) {
+                    totalStokPerItem[keyStandard].limitStok = it.limitStok;
+                }
+            });
+
+            let searchKeyword = document.getElementById('searchTabStokTotal').value.trim().toLowerCase();
+            let keys = Object.keys(totalStokPerItem);
+
+            if(searchKeyword !== '') {
+                keys = keys.filter(k => totalStokPerItem[k].displayName.toLowerCase().includes(searchKeyword) || (totalStokPerItem[k].code && totalStokPerItem[k].code.toLowerCase().includes(searchKeyword)));
+            }
+
+            if(keys.length === 0) return alert("Tidak ada data stok total untuk diexport.");
+
+            let dataMap = keys.map((key, i) => {
+                let item = totalStokPerItem[key];
+                let lokasiText = [...new Set(item.lokasi)].join(', ');
+                return {
+                    "No": i + 1,
+                    "Nama Barang": item.displayName,
+                    "Kode Barang": item.code,
+                    "Total Akumulasi (Pcs)": item.totalPcs,
+                    "Sebaran Lokasi Rak": lokasiText,
+                    "Limit Minimum (Pcs)": item.limitStok > 0 ? item.limitStok : "-"
+                };
+            });
+
+            let ws = XLSX.utils.json_to_sheet(dataMap); 
+            let wb = XLSX.utils.book_new(); 
+            XLSX.utils.book_append_sheet(wb, ws, "Stok Total Gudang"); 
+            XLSX.writeFile(wb, "Data_Stok_Total_Gudang.xlsx");
         }
 
         function exportLimitExcel() {
