@@ -311,7 +311,10 @@
         .pallet-pagination { display: flex; gap: 3px; align-items: center; }
         .page-btn { padding: 2px 6px; border: 1px solid var(--border-color); background: white; cursor: pointer; border-radius: 3px; font-size: 0.75rem; }
         .page-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        
+        .rack-action-group { display: flex; gap: 5px; align-items: center; }
         .btn-add-pallet-spec { background: #8b5cf6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+        .btn-delete-rack-spec { background: var(--danger); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
 
         /* PRINT SHEET STYLING */
         #print-sheet { display: none; }
@@ -837,15 +840,69 @@
             }
         }
 
+        function hapusPalletDariRak(rackName, palletName) {
+            if (currentUserRole !== 'admin') {
+                return alert("Hanya admin yang dapat menghapus pallet!");
+            }
+
+            if (confirm(`Apakah Anda yakin ingin menghapus "${palletName}" dari ${rackName}?\nSemua barang yang ada di dalam pallet ini akan ikut terhapus secara permanen!`)) {
+                const rackIndex = racks.findIndex(r => r.name === rackName);
+                if (rackIndex !== -1) {
+                    if (racks[rackIndex].palletCount > 1) {
+                        racks[rackIndex].palletCount -= 1;
+                        db.ref('racks').set(racks);
+                    } else {
+                        alert("Rak harus memiliki minimal 1 pallet!");
+                        return;
+                    }
+
+                    const itemsToDelete = stok.filter(s => s.rack === rackName && s.pallet === palletName);
+                    itemsToDelete.forEach(item => {
+                        db.ref('stok/' + item._key).remove();
+                    });
+
+                    alert(`Pallet ${palletName} berhasil dihapus dari ${rackName}!`);
+                }
+            }
+        }
+
+        function hapusRak(rackName) {
+            if (currentUserRole !== 'admin') {
+                return alert("Hanya admin yang dapat menghapus rak!");
+            }
+
+            if (racks.length <= 1) {
+                return alert("Gudang harus memiliki minimal 1 rak!");
+            }
+
+            if (confirm(`PERINGATAN!\nApakah Anda yakin ingin menghapus seluruh "${rackName}"?\nSemua pallet dan barang yang tersimpan di dalam ${rackName} akan terhapus secara permanen!`)) {
+                const updatedRacks = racks.filter(r => r.name !== rackName);
+                db.ref('racks').set(updatedRacks);
+
+                const itemsToDelete = stok.filter(s => s.rack === rackName);
+                itemsToDelete.forEach(item => {
+                    db.ref('stok/' + item._key).remove();
+                });
+
+                document.getElementById('filterRack').value = "";
+                alert(`Rak "${rackName}" beserta seluruh isinya berhasil dihapus!`);
+            }
+        }
+
         function simpanRak() {
-            const name = document.getElementById('inputNamaRak').value;
+            const name = document.getElementById('inputNamaRak').value.trim();
             const count = parseInt(document.getElementById('inputJmlPallet').value);
             if(!name || !count) return alert("Isi data rak dengan lengkap!");
+            
+            let exists = racks.some(r => r.name.toLowerCase() === name.toLowerCase());
+            if(exists) return alert("Nama rak sudah ada!");
+
             racks.push({ name, palletCount: count });
             db.ref('racks').set(racks);
             document.getElementById('inputNamaRak').value = '';
             document.getElementById('inputJmlPallet').value = '';
             toggleForm('rackForm');
+            alert(`Rak "${name}" berhasil ditambahkan!`);
         }
 
         function simpanSatuanBaru() {
@@ -1080,7 +1137,7 @@
             if(!op || op.trim() === "") return alert("Wajib mengisi 'Nama Operator' di bagian atas halaman!");
 
             const item = document.getElementById('inputNamaBarang').value.trim();
-            const code = document.getElementById('inputKodeBarang').value || '-'; 
+            const code = document.getElementById('inputKodeBarang').value.trim() || '-'; 
             const qty = parseInt(document.getElementById('inputQty').value);
             const unit = document.getElementById('unit').value;
             const isi = parseInt(document.getElementById('inputIsi').value) || 1;
@@ -1142,7 +1199,7 @@
             if(!item) return;
 
             let editNama = document.getElementById('editNama').value.trim();
-            let editKode = document.getElementById('editKode').value;
+            let editKode = document.getElementById('editKode').value.trim() || '-';
             let editQty = parseInt(document.getElementById('editQty').value);
             let editUnit = document.getElementById('editUnit').value;
             let editIsi = parseInt(document.getElementById('editIsi').value) || 1;
@@ -1262,14 +1319,15 @@
             let pending = permintaan.filter(p => p.status === 'pending').length;
             document.getElementById('tabBtnPermintaan').innerHTML = pending > 0 ? `📝 Permintaan <span style="background:#ef4444; color:white; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:bold;">${pending}</span>` : `📝 Permintaan`;
             
-            // PENGELOMPOKAN STOK TOTAL
             let totalStokPerItem = {};
             stok.forEach(it => {
                 let keyStandard = it.item.trim().toLowerCase();
+                let currentCode = (it.code && it.code.trim() !== '') ? it.code.trim() : '-';
+
                 if (!totalStokPerItem[keyStandard]) {
                     totalStokPerItem[keyStandard] = { 
                         displayName: it.item.trim(), 
-                        code: it.code || '-', 
+                        codes: [], 
                         totalPcs: 0, 
                         unit: it.unit, 
                         isi: it.isiPerUnit, 
@@ -1277,6 +1335,11 @@
                         lokasi: [] 
                     };
                 }
+
+                if (!totalStokPerItem[keyStandard].codes.includes(currentCode)) {
+                    totalStokPerItem[keyStandard].codes.push(currentCode);
+                }
+
                 totalStokPerItem[keyStandard].totalPcs += it.totalPcs;
                 totalStokPerItem[keyStandard].lokasi.push(`${it.rack} - ${it.pallet}`);
                 if ((it.limitStok || 0) > totalStokPerItem[keyStandard].limitStok) {
@@ -1284,16 +1347,15 @@
                 }
             });
 
-            // Populasi Dropdown Permintaan Barang
             let optionsReqHtml = '<option value="">Pilih Barang dari Stok...</option>';
             Object.keys(totalStokPerItem).forEach(key => {
                 let itemObj = totalStokPerItem[key];
-                let label = (itemObj.code && itemObj.code !== '-') ? `[${itemObj.code}] ${itemObj.displayName}` : itemObj.displayName;
+                let combinedCodes = itemObj.codes.filter(c => c !== '-').join(', ');
+                let label = combinedCodes ? `[${combinedCodes}] ${itemObj.displayName}` : itemObj.displayName;
                 optionsReqHtml += `<option value="${itemObj.displayName}">${label}</option>`;
             });
             document.getElementById('reqNamaBarang').innerHTML = optionsReqHtml;
             
-            // RENDER PERMINTAAN (Case-Insensitive & Auto-Group Spasi)
             let pContainer = document.getElementById('permintaanContainer'); 
             pContainer.innerHTML = '';
 
@@ -1350,7 +1412,6 @@
                 });
             });
 
-            // RENDER RIWAYAT (Case-Insensitive Operator Grouping)
             let searchR = document.getElementById('searchRiwayat').value.toLowerCase();
             let filterTipe = document.getElementById('filterTipeRiwayat').value;
             let rContainer = document.getElementById('riwayatContainer'); 
@@ -1366,7 +1427,6 @@
                 return matchesSearch && matchesType;
             });
 
-            // Pengelompokan Operator Secara Case-Insensitive & Pembersihan Spasi
             let operatorGroupMap = {};
             filteredRiwayat.forEach(r => {
                 let rawOp = (r.operator && r.operator.trim() !== '') ? r.operator.trim() : 'Sistem';
@@ -1408,7 +1468,6 @@
                 }).join('');
             });
 
-            // Populate Dropdown Rak pada Form Input & Filter Rak
             document.getElementById('selectRack').innerHTML = 
                 '<option value="">Pilih Rak...</option>' + 
                 racks.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
@@ -1489,12 +1548,32 @@
                             paginationHtml = `<div class="pallet-pagination"><span style="font-size: 0.7rem; color:#64748b;">Hal:</span>${pageButtons}</div>`;
                         }
 
-                        finalPalletsHtml += `<div class="pallet-card"><div class="pallet-header"><span>📦 ${pName} <small style="font-weight:normal; color:#94a3b8;">(${totalItems} item)</small></span>${paginationHtml}</div><div style="flex-grow:1;">${itemsHtml}</div></div>`;
+                        let btnHapusPalletHtml = currentUserRole === 'admin' ? `<button onclick="hapusPalletDariRak('${r.name}', '${pName}')" style="background:#ef4444; color:white; border:none; padding:2px 6px; border-radius:3px; cursor:pointer; font-size:0.7rem; margin-left:5px;" title="Hapus Pallet">🗑️</button>` : '';
+
+                        finalPalletsHtml += `<div class="pallet-card"><div class="pallet-header"><span>📦 ${pName} <small style="font-weight:normal; color:#94a3b8;">(${totalItems} item)</small></span><div style="display:flex; align-items:center;">${btnHapusPalletHtml}${paginationHtml}</div></div><div style="flex-grow:1;">${itemsHtml}</div></div>`;
                     }
                     
-                    let btnAddPalletHtml = currentUserRole === 'admin' ? `<button class="btn-add-pallet-spec" onclick="tambahPalletKeRak('${r.name}')">➕ Pallet</button>` : '';
+                    let rackActionButtonsHtml = "";
+                    if (currentUserRole === 'admin') {
+                        rackActionButtonsHtml = `
+                            <div class="rack-action-group">
+                                <button class="btn-add-pallet-spec" onclick="tambahPalletKeRak('${r.name}')">➕ Pallet</button>
+                                <button class="btn-delete-rack-spec" onclick="hapusRak('${r.name}')" title="Hapus Rak Ini">🗑️ Hapus Rak</button>
+                            </div>
+                        `;
+                    }
 
-                    if(finalPalletsHtml !== "") mContainer.insertAdjacentHTML('beforeend', `<div class="rack-section"><div class="rack-header-row"><h2 class="rack-title">${r.name}</h2>${btnAddPalletHtml}</div><div class="pallet-container">${finalPalletsHtml}</div></div>`);
+                    if(finalPalletsHtml !== "") {
+                        mContainer.insertAdjacentHTML('beforeend', `
+                            <div class="rack-section">
+                                <div class="rack-header-row">
+                                    <h2 class="rack-title">${r.name}</h2>
+                                    ${rackActionButtonsHtml}
+                                </div>
+                                <div class="pallet-container">${finalPalletsHtml}</div>
+                            </div>
+                        `);
+                    }
                 });
                 
                 if (mContainer.innerHTML === "" && filterRackValue !== "" && filterRackValue !== "ALL") {
@@ -1516,7 +1595,12 @@
             let keys = Object.keys(dataTotal);
 
             if(filterKeyword !== '') {
-                keys = keys.filter(k => dataTotal[k].displayName.toLowerCase().includes(filterKeyword) || (dataTotal[k].code && dataTotal[k].code.toLowerCase().includes(filterKeyword)));
+                keys = keys.filter(k => {
+                    let item = dataTotal[k];
+                    let matchName = item.displayName.toLowerCase().includes(filterKeyword);
+                    let matchCode = item.codes.some(c => c.toLowerCase().includes(filterKeyword));
+                    return matchName || matchCode;
+                });
             }
 
             if(keys.length === 0) { container.innerHTML = `<div style="color:#94a3b8; text-align:center; padding:15px; font-size:0.9rem;">Barang tidak ditemukan.</div>`; return; }
@@ -1527,11 +1611,12 @@
                 if(item.unit.toLowerCase() !== 'pcs') konversiSatuan += ` (${Math.ceil(item.totalPcs / item.isi)} ${item.unit})`;
                 let limitDisplay = item.limitStok > 0 ? `${item.limitStok} Pcs` : '-';
                 let lokasiText = [...new Set(item.lokasi)].join(', ');
+                let combinedCodesText = item.codes.join(', ');
 
-                return `<tr><td>${idx + 1}</td><td><b>${item.displayName}</b></td><td><span style="color:#6366f1; font-weight:600;">${item.code}</span></td><td><b>${konversiSatuan}</b></td><td><small style="color:#64748b;">${lokasiText}</small></td><td><span style="color:#ef4444; font-weight:600;">${limitDisplay}</span></td></tr>`;
+                return `<tr><td>${idx + 1}</td><td><b>${item.displayName}</b></td><td><span style="color:#6366f1; font-weight:600;">${combinedCodesText}</span></td><td><b>${konversiSatuan}</b></td><td><small style="color:#64748b;">${lokasiText}</small></td><td><span style="color:#ef4444; font-weight:600;">${limitDisplay}</span></td></tr>`;
             }).join('');
 
-            container.innerHTML = `<table class="total-stock-table"><thead><tr><th style="width:5%;">No</th><th>Nama Barang</th><th>Kode Barang</th><th>Total Akumulasi Stok</th><th>Sebaran Lokasi Rak</th><th>Limit Min</th></tr></thead><tbody>${tableRows}</tbody></table>`;
+            container.innerHTML = `<table class="total-stock-table"><thead><tr><th style="width:5%;">No</th><th>Nama Barang</th><th>Kode Barang (Gabungan)</th><th>Total Akumulasi Stok</th><th>Sebaran Lokasi Rak</th><th>Limit Min</th></tr></thead><tbody>${tableRows}</tbody></table>`;
         }
 
         function renderTabelStokTotalTab(dataTotal) {
@@ -1567,11 +1652,12 @@
                 if(item.unit.toLowerCase() !== 'pcs') konversiSatuan += ` (${Math.ceil(item.totalPcs / item.isi)} ${item.unit})`;
                 let statusBadge = item.totalPcs === 0 ? `<span style="background:#ef4444; color:white; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold;">HABIS</span>` : `<span style="background:#f59e0b; color:white; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold;">CRITICAL</span>`;
                 let lokasiUnique = [...new Set(item.lokasi)].join(', ');
+                let combinedCodesText = item.codes.join(', ');
 
                 return `<tr>
                     <td style="text-align:center;">${idx + 1}</td>
                     <td><b>${item.displayName}</b></td>
-                    <td><span style="color:#6366f1; font-weight:600;">${item.code}</span></td>
+                    <td><span style="color:#6366f1; font-weight:600;">${combinedCodesText}</span></td>
                     <td><b style="color:#ef4444;">${konversiSatuan}</b></td>
                     <td style="font-weight:bold; color:#f59e0b;">${item.limitStok} Pcs</td>
                     <td><small style="color:#64748b;">${lokasiUnique || '-'}</small></td>
@@ -1606,16 +1692,21 @@
             let totalStokPerItem = {};
             stok.forEach(it => {
                 let keyStandard = it.item.trim().toLowerCase();
+                let currentCode = (it.code && it.code.trim() !== '') ? it.code.trim() : '-';
+
                 if (!totalStokPerItem[keyStandard]) {
                     totalStokPerItem[keyStandard] = { 
                         displayName: it.item.trim(), 
-                        code: it.code || '-', 
+                        codes: [], 
                         totalPcs: 0, 
                         unit: it.unit, 
                         isi: it.isiPerUnit, 
                         limitStok: it.limitStok || 0, 
                         lokasi: [] 
                     };
+                }
+                if (!totalStokPerItem[keyStandard].codes.includes(currentCode)) {
+                    totalStokPerItem[keyStandard].codes.push(currentCode);
                 }
                 totalStokPerItem[keyStandard].totalPcs += it.totalPcs;
                 totalStokPerItem[keyStandard].lokasi.push(`${it.rack} - ${it.pallet}`);
@@ -1628,7 +1719,12 @@
             let keys = Object.keys(totalStokPerItem);
 
             if(searchKeyword !== '') {
-                keys = keys.filter(k => totalStokPerItem[k].displayName.toLowerCase().includes(searchKeyword) || (totalStokPerItem[k].code && totalStokPerItem[k].code.toLowerCase().includes(searchKeyword)));
+                keys = keys.filter(k => {
+                    let item = totalStokPerItem[k];
+                    let matchName = item.displayName.toLowerCase().includes(searchKeyword);
+                    let matchCode = item.codes.some(c => c.toLowerCase().includes(searchKeyword));
+                    return matchName || matchCode;
+                });
             }
 
             if(keys.length === 0) return alert("Tidak ada data stok total untuk diexport.");
@@ -1636,10 +1732,11 @@
             let dataMap = keys.map((key, i) => {
                 let item = totalStokPerItem[key];
                 let lokasiText = [...new Set(item.lokasi)].join(', ');
+                let combinedCodesText = item.codes.join(', ');
                 return {
                     "No": i + 1,
                     "Nama Barang": item.displayName,
-                    "Kode Barang": item.code,
+                    "Kode Barang (Gabungan)": combinedCodesText,
                     "Total Akumulasi (Pcs)": item.totalPcs,
                     "Sebaran Lokasi Rak": lokasiText,
                     "Limit Minimum (Pcs)": item.limitStok > 0 ? item.limitStok : "-"
@@ -1656,8 +1753,13 @@
             let totalStokPerItem = {};
             stok.forEach(it => {
                 let keyStandard = it.item.trim().toLowerCase();
+                let currentCode = (it.code && it.code.trim() !== '') ? it.code.trim() : '-';
+
                 if (!totalStokPerItem[keyStandard]) {
-                    totalStokPerItem[keyStandard] = { displayName: it.item.trim(), code: it.code || '-', totalPcs: 0, unit: it.unit, isi: it.isiPerUnit, limitStok: it.limitStok || 0 };
+                    totalStokPerItem[keyStandard] = { displayName: it.item.trim(), codes: [], totalPcs: 0, unit: it.unit, isi: it.isiPerUnit, limitStok: it.limitStok || 0 };
+                }
+                if (!totalStokPerItem[keyStandard].codes.includes(currentCode)) {
+                    totalStokPerItem[keyStandard].codes.push(currentCode);
                 }
                 totalStokPerItem[keyStandard].totalPcs += it.totalPcs;
                 if ((it.limitStok || 0) > totalStokPerItem[keyStandard].limitStok) totalStokPerItem[keyStandard].limitStok = it.limitStok;
@@ -1671,7 +1773,7 @@
                     dataMap.push({
                         "No": no++,
                         "Nama Barang": it.displayName,
-                        "Kode Barang": it.code,
+                        "Kode Barang": it.codes.join(', '),
                         "Sisa Total (Pcs)": it.totalPcs,
                         "Batas Limit (Pcs)": it.limitStok,
                         "Status": it.totalPcs === 0 ? "STOK HABIS" : "MENDEKATI LIMIT"
@@ -1686,7 +1788,7 @@
 
         function exportPermintaanExcel() {
             let dataMap = []; let no = 1;
-            permintaan.forEach(p => { p.items.forEach(item => { dataMap.push({"No": no++, "Tanggal": p.tanggal, "Nama": p.peminta, "Departemen": p.departemen || "-", "Kode Barang": item.code || "-", "Nama Barang": item.item, "Jumlah": item.qty, "Satuan": item.unit, "Total Pcs": item.totalPcs, "Status": p.status === 'done' ? 'Selesai' : 'Pending', "Operator": p.operator || "-"}); }); });
+            permintaan.forEach(p => { p.items.forEach(item => { dataMap.push({"No": no++, "Tanggal": p.tanggal, "Name": p.peminta, "Departemen": p.departemen || "-", "Kode Barang": item.code || "-", "Nama Barang": item.item, "Jumlah": item.qty, "Satuan": item.unit, "Total Pcs": item.totalPcs, "Status": p.status === 'done' ? 'Selesai' : 'Pending', "Operator": p.operator || "-"}); }); });
             let ws = XLSX.utils.json_to_sheet(dataMap); let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Permintaan"); XLSX.writeFile(wb, "Data_Permintaan_Barang.xlsx");
         }
         
