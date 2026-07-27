@@ -388,7 +388,7 @@
                 <!-- FORM BARANG BARU (ADMIN ONLY) -->
                 <div class="card" id="formInputBarangCard">
                     <h3 style="margin-bottom:15px; font-size:1rem;">📥 Tambah Barang ke Stok</h3>
-                    <div class="input-group"><label>Nama Barang</label><input type="text" id="inputNamaBarang" placeholder="Contoh: Lakban Bening"></div>
+                    <div class="input-group"><label>Nama Barang</label><input type="text" id="inputNamaBarang" placeholder="Contoh: Lakban Bening" oninput="autoSelectSatuanByNama(this.value)"></div>
                     <div class="input-group"><label>Kode Barang (Opsional)</label><input type="text" id="inputKodeBarang" placeholder="Contoh: LKB-01"></div>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                         <div class="input-group"><label>Jumlah</label><input type="number" id="inputQty" placeholder="10"></div>
@@ -426,7 +426,6 @@
             <!-- SEARCH & FILTER -->
             <div class="card" style="display:flex; gap:15px; flex-wrap:wrap; align-items:center;">
                 <input type="text" id="searchInput" placeholder="🔍 Cari Barang / Kode..." oninput="resetPageAndRender()" style="flex:1; padding:10px; border:1px solid var(--border-color); border-radius:8px; min-width:200px;">
-                <!-- FILTER RAK SAMPING PENCARIAN -->
                 <select id="filterRack" onchange="resetPageAndRender()" style="padding:10px; border:1px solid var(--border-color); border-radius:8px; min-width:200px; font-weight:600;"></select>
                 <button onclick="exportStokExcel()" style="background:var(--success); color:white; border:none; padding:10px 15px; border-radius:8px; font-weight:600; cursor:pointer;">📊 Export Excel</button>
             </div>
@@ -459,7 +458,7 @@
         <div id="limit" class="tab-content">
             <div class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
-                    <h3 style="color:var(--danger);">⚠️ Daftar Barang Mencapai Limit Minimum</h3>
+                    <h3 style="color:var(--danger);">⚠️ Barang Mencapai Limit Minimum</h3>
                     <button onclick="exportLimitExcel()" style="background:var(--success); color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:600; cursor:pointer;">📊 Export Limit Excel</button>
                 </div>
                 <div id="barangLimitContainer"></div>
@@ -587,7 +586,6 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // Kredensial Akses
         const ROLE_PASSWORDS = {
             admin: "admin123",
             gudang: "gudang123",
@@ -642,7 +640,6 @@
                     osc.start(now + item.start);
                     osc.stop(now + item.start + item.duration);
                 });
-
             } catch(e) {
                 console.log("Web Audio API error/blocked:", e);
             }
@@ -808,6 +805,13 @@
             }
         }
 
+        // Event listener untuk tombol Enter pada form login
+        document.getElementById('loginPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                prosesLogin();
+            }
+        });
+
         function prosesLogout() {
             currentUserRole = null;
             sessionStorage.removeItem('gudang_role');
@@ -924,6 +928,29 @@
             document.getElementById('unitAmbil').innerHTML = optionsHtml;
             document.getElementById('editUnit').innerHTML = customUnits.map(u => `<option value="${u}">${u}</option>`).join('');
             document.getElementById('reqUnit').innerHTML = optionsHtml;
+        }
+
+        function autoSelectSatuanByNama(namaBarang) {
+            let cleanName = namaBarang.trim().toLowerCase();
+            if (!cleanName) return;
+            
+            let foundItem = stok.find(s => s.item.trim().toLowerCase() === cleanName);
+            if (foundItem && foundItem.unit) {
+                document.getElementById('unit').value = foundItem.unit;
+                if (foundItem.isiPerUnit) {
+                    document.getElementById('inputIsi').value = foundItem.isiPerUnit;
+                }
+                if (foundItem.limitStok) {
+                    document.getElementById('inputLimit').value = foundItem.limitStok;
+                }
+            }
+        }
+
+        function updateUnitForRequest() {
+            const selectEl = document.getElementById('reqNamaBarang');
+            const selectedOption = selectEl.options[selectEl.selectedIndex];
+            const unitValue = selectedOption.getAttribute('data-unit');
+            document.getElementById('reqUnit').value = unitValue || '';
         }
 
         function updatePalletDropdown() {
@@ -1304,13 +1331,6 @@
             } 
         }
 
-        function updateUnitForRequest() {
-            const itemName = document.getElementById('reqNamaBarang').value;
-            const itemInStok = stok.find(s => s.item.trim().toLowerCase() === itemName.trim().toLowerCase());
-            document.getElementById('reqUnit').value = itemInStok ? itemInStok.unit : '';
-        }
-
-        // ================= FUNGSI UTAMA ENGINE RENDER INTERFACE =================
         function renderAll() {
             if (!currentUserRole) return;
             
@@ -1352,7 +1372,7 @@
                 let itemObj = totalStokPerItem[key];
                 let combinedCodes = itemObj.codes.filter(c => c !== '-').join(', ');
                 let label = combinedCodes ? `[${combinedCodes}] ${itemObj.displayName}` : itemObj.displayName;
-                optionsReqHtml += `<option value="${itemObj.displayName}">${label}</option>`;
+                optionsReqHtml += `<option value="${itemObj.displayName}" data-unit="${itemObj.unit}">${label} (Satuan: ${itemObj.unit})</option>`;
             });
             document.getElementById('reqNamaBarang').innerHTML = optionsReqHtml;
             
