@@ -525,8 +525,9 @@
                         <button onclick="exportRiwayatExcel()" style="background:var(--success); color:white; border:none; padding:8px 12px; border-radius:6px; font-weight:600; cursor:pointer;">📊 Export Excel</button>
                     </div>
                 </div>
-                <div style="display:flex; gap:10px; margin-bottom:15px;">
-                    <input type="text" id="searchRiwayat" placeholder="🔍 Cari barang / operator..." oninput="renderAll()" style="flex:1; padding:8px; border:1px solid var(--border-color); border-radius:6px;">
+                <div style="display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap;">
+                    <input type="text" id="searchRiwayat" placeholder="🔍 Cari barang / operator..." oninput="renderAll()" style="flex:1; padding:8px; border:1px solid var(--border-color); border-radius:6px; min-width:200px;">
+                    <input type="date" id="filterTanggalRiwayat" onchange="renderAll()" style="padding:8px; border:1px solid var(--border-color); border-radius:6px;">
                     <select id="filterTipeRiwayat" onchange="renderAll()" style="padding:8px; border:1px solid var(--border-color); border-radius:6px;">
                         <option value="">Semua Tipe</option>
                         <option value="masuk">Masuk</option>
@@ -1518,6 +1519,7 @@
 
             let searchR = document.getElementById('searchRiwayat').value.toLowerCase();
             let filterTipe = document.getElementById('filterTipeRiwayat').value;
+            let filterTanggalInput = document.getElementById('filterTanggalRiwayat').value;
             let rContainer = document.getElementById('riwayatContainer'); 
             rContainer.innerHTML = '';
 
@@ -1528,7 +1530,25 @@
                 let matchesSearch = itemName.includes(searchR) || itemCode.includes(searchR) || operatorName.includes(searchR);
                 let rType = r.type || 'keluar';
                 let matchesType = (filterTipe === "") ? true : (rType === filterTipe);
-                return matchesSearch && matchesType;
+
+                let matchesTanggal = true;
+                if (filterTanggalInput && r.tanggal) {
+                    let tanggalLogPart = r.tanggal.split(',')[0].trim(); 
+                    let parts = tanggalLogPart.split('/'); 
+                    
+                    if (parts.length === 3) {
+                        let day = parts[0].padStart(2, '0');
+                        let month = parts[1].padStart(2, '0');
+                        let year = parts[2];
+                        let formattedLogDate = `${year}-${month}-${day}`; 
+                        
+                        matchesTanggal = (formattedLogDate === filterTanggalInput);
+                    } else {
+                        matchesTanggal = false;
+                    }
+                }
+
+                return matchesSearch && matchesType && matchesTanggal;
             });
 
             let operatorGroupMap = {};
