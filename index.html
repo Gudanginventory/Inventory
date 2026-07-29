@@ -484,7 +484,12 @@
                     <div class="input-group"><label>Departemen</label><input type="text" id="reqDepartemen" placeholder="Produksi / QA / dll"></div>
                     
                     <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:15px; border:1px solid var(--border-color);">
-                        <div class="input-group"><label>Pilih Barang</label><select id="reqNamaBarang" onchange="updateUnitForRequest()"></select></div>
+                        <div class="input-group">
+                            <label>Pilih Barang</label>
+                            <input type="text" id="inputCariReqBarang" list="listBarangGudang" placeholder="🔍 Ketik atau cari nama/kode barang..." oninput="pilihBarangDariDatalist(this.value)">
+                            <datalist id="listBarangGudang"></datalist>
+                            <select id="reqNamaBarang" style="display:none;" onchange="updateUnitForRequest()"></select>
+                        </div>
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                             <div class="input-group"><label>Jumlah</label><input type="number" id="reqQty" placeholder="1"></div>
                             <div class="input-group"><label>Satuan</label><select id="reqUnit"></select></div>
@@ -796,7 +801,6 @@
                     document.getElementById('tabBtnPermintaan').style.display = 'flex';
                     switchTab('permintaan', document.getElementById('tabBtnPermintaan'));
                     
-                    // Auto-fill nama peminta jika sudah tersimpan
                     let savedOp = localStorage.getItem('gudang_operator');
                     if(savedOp && !document.getElementById('reqNamaPeminta').value) {
                         document.getElementById('reqNamaPeminta').value = savedOp;
@@ -976,6 +980,17 @@
             document.getElementById('reqUnit').value = unitValue || '';
         }
 
+        function pilihBarangDariDatalist(namaBarang) {
+            const selectEl = document.getElementById('reqNamaBarang');
+            for (let option of selectEl.options) {
+                if (option.value.toLowerCase() === namaBarang.toLowerCase()) {
+                    selectEl.value = option.value;
+                    updateUnitForRequest();
+                    break;
+                }
+            }
+        }
+
         function updatePalletDropdown() {
             const rackName = document.getElementById('selectRack').value;
             const palletSelect = document.getElementById('selectPallet');
@@ -1000,7 +1015,7 @@
         }
 
         function addToDraft() {
-            const itemName = document.getElementById('reqNamaBarang').value;
+            const itemName = document.getElementById('inputCariReqBarang').value || document.getElementById('reqNamaBarang').value;
             const qty = parseInt(document.getElementById('reqQty').value);
             const unit = document.getElementById('reqUnit').value;
             if(!itemName || !qty || !unit) return alert("Pilih barang, isi jumlah, dan satuan!");
@@ -1010,6 +1025,7 @@
             const totalPcs = qty * (unit.toLowerCase() !== 'pcs' ? isi : 1);
             draftItems.push({ item: itemName, code: code, qty, unit, totalPcs });
             renderDraft();
+            document.getElementById('inputCariReqBarang').value = '';
             document.getElementById('reqNamaBarang').value = '';
             document.getElementById('reqQty').value = '';
             document.getElementById('reqUnit').value = '';
@@ -1413,12 +1429,16 @@
             });
 
             let optionsReqHtml = '<option value="">Pilih Barang dari Stok...</option>';
+            let datalistHtml = '';
             Object.keys(totalStokPerItem).forEach(key => {
                 let itemObj = totalStokPerItem[key];
                 let combinedCodes = itemObj.codes.filter(c => c !== '-').join(', ');
                 let label = combinedCodes ? `[${combinedCodes}] ${itemObj.displayName}` : itemObj.displayName;
+                
+                datalistHtml += `<option value="${itemObj.displayName}" data-unit="${itemObj.unit}">`;
                 optionsReqHtml += `<option value="${itemObj.displayName}" data-unit="${itemObj.unit}">${label} (Satuan: ${itemObj.unit})</option>`;
             });
+            document.getElementById('listBarangGudang').innerHTML = datalistHtml;
             document.getElementById('reqNamaBarang').innerHTML = optionsReqHtml;
             
             let pContainer = document.getElementById('permintaanContainer'); 
