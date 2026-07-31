@@ -646,6 +646,24 @@
         </div>
     </div>
 
+    <!-- MODAL EDIT ITEM PERMINTAAN -->
+    <div id="editPermintaanItemModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-bottom:18px; font-size:1.1rem; font-weight:700;">✏️ Edit Jumlah / Barang Permintaan</h3>
+            <input type="hidden" id="editReqKey">
+            <input type="hidden" id="editReqIndex">
+            <div class="input-group"><label>Nama Barang</label><input type="text" id="editReqItemName" readonly style="background:#f1f5f9;"></div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                <div class="input-group"><label>Jumlah</label><input type="number" id="editReqQty"></div>
+                <div class="input-group"><label>Satuan</label><select id="editReqUnit"></select></div>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:24px;">
+                <button class="btn" onclick="saveEditPermintaanItem()">Simpan Perubahan</button>
+                <button class="btn" onclick="closeModal('editPermintaanItemModal')" style="background:#64748b;">Batal</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL PINDAH LOKASI BARANG -->
     <div id="pindahModal" class="modal">
         <div class="modal-content">
@@ -1023,6 +1041,7 @@
             document.getElementById('unitAmbil').innerHTML = optionsHtml;
             document.getElementById('editUnit').innerHTML = customUnits.map(u => `<option value="${u}">${u}</option>`).join('');
             document.getElementById('reqUnit').innerHTML = optionsHtml;
+            document.getElementById('editReqUnit').innerHTML = optionsHtml;
         }
 
         function autoSelectSatuanByNama(namaBarang) {
@@ -1120,6 +1139,7 @@
                 departemen, 
                 items: draftItems, 
                 tanggal: new Date().toLocaleDateString('id-ID'), 
+                timestamp: Date.now(),
                 status: 'processing', 
                 sedangDisiapkan: false,
                 operator: '' 
@@ -1146,11 +1166,74 @@
             if (currentUserRole !== 'admin' && currentUserRole !== 'gudang') {
                 return alert("Akses Ditolak! Hanya Petugas Gudang dan Admin yang dapat mengubah status persiapan barang.");
             }
-            // Jika dicentang, otomatis ubah sedangDisiapkan menjadi true
             if (!currentStatus) {
                 db.ref('permintaan/' + key).update({
                     sedangDisiapkan: true
                 });
+            }
+        }
+
+        function openEditPermintaanItemModal(reqKey, itemIndex) {
+            if (currentUserRole !== 'admin' && currentUserRole !== 'gudang') {
+                return alert("Akses Ditolak! Hanya Admin dan Petugas Gudang yang dapat mengedit item permintaan.");
+            }
+            let reqObj = permintaan.find(p => p._key === reqKey);
+            if (!reqObj || !reqObj.items[itemIndex]) return;
+
+            let targetItem = reqObj.items[itemIndex];
+            document.getElementById('editReqKey').value = reqKey;
+            document.getElementById('editReqIndex').value = itemIndex;
+            document.getElementById('editReqItemName').value = targetItem.item;
+            document.getElementById('editReqQty').value = targetItem.qty;
+            document.getElementById('editReqUnit').value = targetItem.unit;
+
+            document.getElementById('editPermintaanItemModal').style.display = 'flex';
+        }
+
+        function saveEditPermintaanItem() {
+            let reqKey = document.getElementById('editReqKey').value;
+            let itemIndex = parseInt(document.getElementById('editReqIndex').value);
+            let newQty = parseInt(document.getElementById('editReqQty').value);
+            let newUnit = document.getElementById('editReqUnit').value;
+
+            if (!newQty || !newUnit) return alert("Jumlah dan Satuan tidak boleh kosong!");
+
+            let reqObj = permintaan.find(p => p._key === reqKey);
+            if (!reqObj || !reqObj.items[itemIndex]) return;
+
+            let targetItem = reqObj.items[itemIndex];
+            let itemInStok = stok.find(s => s.item.trim().toLowerCase() === targetItem.item.trim().toLowerCase());
+            let isi = itemInStok ? itemInStok.isiPerUnit : 1;
+            let totalPcs = newQty * (newUnit.toLowerCase() !== 'pcs' ? isi : 1);
+
+            reqObj.items[itemIndex].qty = newQty;
+            reqObj.items[itemIndex].unit = newUnit;
+            reqObj.items[itemIndex].totalPcs = totalPcs;
+
+            db.ref('permintaan/' + reqKey).update({ items: reqObj.items });
+            closeModal('editPermintaanItemModal');
+            alert("Item permintaan berhasil diperbarui!");
+        }
+
+        function hapusItemPermintaanDariList(reqKey, itemIndex) {
+            if (currentUserRole !== 'admin' && currentUserRole !== 'gudang') {
+                return alert("Akses Ditolak! Hanya Admin dan Petugas Gudang yang dapat menghapus item dari permintaan.");
+            }
+            let reqObj = permintaan.find(p => p._key === reqKey);
+            if (!reqObj || !reqObj.items[itemIndex]) return;
+
+            if (confirm(`Apakah Anda yakin ingin menghapus barang "${reqObj.items[itemIndex].item}" dari daftar permintaan ini?`)) {
+                reqObj.items.splice(itemIndex, 1);
+                
+                if (reqObj.items.length === 0) {
+                    if (confirm("Daftar barang pada permintaan ini menjadi kosong. Apakah Anda ingin menghapus seluruh permintaan ini?")) {
+                        db.ref('permintaan/' + reqKey).remove();
+                        return;
+                    }
+                }
+
+                db.ref('permintaan/' + reqKey).update({ items: reqObj.items });
+                alert("Item berhasil dihapus dari permintaan!");
             }
         }
 
@@ -1477,6 +1560,10 @@
             
             let searchPerm = document.getElementById('searchPermintaan').value.toLowerCase();
             let filteredPerm = permintaan.filter(p => p.peminta.toLowerCase().includes(searchPerm) || p.items.some(i => i.item.toLowerCase().includes(searchPerm) || (i.code && i.code.toLowerCase().includes(searchPerm))));
+            
+            // Urutkan permintaan berdasarkan timestamp terbaru di atas (Global)
+            filteredPerm.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
             let pendingCount = permintaan.filter(p => p.status !== 'done').length;
             document.getElementById('tabBtnPermintaan').innerHTML = pendingCount > 0 ? `📝 Permintaan <span style="background:#ef4444; color:white; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:bold;">${pendingCount}</span>` : `📝 Permintaan`;
             
@@ -1533,104 +1620,92 @@
             let pContainer = document.getElementById('permintaanContainer'); 
             pContainer.innerHTML = '';
 
-            let groupMap = {};
-
             filteredPerm.forEach(p => {
-                let rawNama = p.peminta ? p.peminta.trim() : 'Tanpa Nama';
-                let keyGroup = rawNama.toLowerCase().replace(/\s+/g, ' '); 
+                let actualIdx = permintaan.indexOf(p);
+                let isDone = p.status === 'done';
+                let isDiproses = p.sedangDisiapkan || false;
+                
+                let badgeStatus = '';
+                let actionBtnText = '';
 
-                if (!groupMap[keyGroup]) {
-                    groupMap[keyGroup] = {
-                        displayName: rawNama, 
-                        requests: []
-                    };
-                }
-                groupMap[keyGroup].requests.push(p);
-            });
-
-            Object.keys(groupMap).forEach(key => {
-                let group = groupMap[key];
-                let namaDisplay = group.displayName;
-                let userReqs = group.requests;
-
-                pContainer.innerHTML += `
-                    <div style="font-weight:bold; margin-top:20px; color:#8b5cf6; border-bottom:2px solid #8b5cf6; padding-bottom:6px; display:flex; justify-content:space-between; align-items:center; font-size:0.95rem;">
-                        <span>👤 Nama: ${namaDisplay}</span>
-                        <button onclick="cetakSemuaUserHariIni('${namaDisplay}')" style="background:#6366f1; color:white; border:none; border-radius:6px; padding:4px 10px; font-size:11px; cursor:pointer; font-weight:600;" class="no-print">🖨️ Cetak Rekap</button>
-                    </div>`;
-
-                userReqs.forEach(p => {
-                    let actualIdx = permintaan.indexOf(p);
-                    let isDone = p.status === 'done';
-                    let isDiproses = p.sedangDisiapkan || false;
-                    
-                    let badgeStatus = '';
-                    let actionBtnText = '';
-
-                    if (isDone) {
-                        badgeStatus = `<span style="background:#10b981; color:white; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:bold;">SELESAI</span>`;
-                        actionBtnText = `<span style="font-size:1.2rem;">✅</span>`;
+                if (isDone) {
+                    badgeStatus = `<span style="background:#10b981; color:white; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:bold;">SELESAI</span>`;
+                    actionBtnText = `<span style="font-size:1.2rem;">✅</span>`;
+                } else {
+                    if (isDiproses) {
+                        badgeStatus = `<button class="btn-status-toggle" style="background:#3b82f6; color:white;" onclick="toggleStatusMenyiapkan('${p._key}', true)" title="Klik untuk ubah kembali">🔄 Sedang Di Proses</button>`;
                     } else {
-                        if (isDiproses) {
-                            badgeStatus = `<button class="btn-status-toggle" style="background:#3b82f6; color:white;" onclick="toggleStatusMenyiapkan('${p._key}', true)" title="Klik untuk ubah kembali">🔄 Sedang Di Proses</button>`;
-                        } else {
-                            badgeStatus = `<button class="btn-status-toggle" style="background:#f59e0b; color:white;" onclick="toggleStatusMenyiapkan('${p._key}', false)" title="Klik untuk tandai sedang diproses">⏳ Belum Di Proses</button>`;
-                        }
+                        badgeStatus = `<button class="btn-status-toggle" style="background:#f59e0b; color:white;" onclick="toggleStatusMenyiapkan('${p._key}', false)" title="Klik untuk tandai sedang diproses">⏳ Belum Di Proses</button>`;
+                    }
 
-                        actionBtnText = `
-                            <button onclick="selesaikanPermintaanByKey('${p._key}')" style="background:#10b981; color:white; border:none; border-radius:6px; width:auto; padding:6px 12px; font-size:12px; cursor:pointer; font-weight:600;" class="no-print">✅ Selesai</button>
+                    actionBtnText = `
+                        <button onclick="selesaikanPermintaanByKey('${p._key}')" style="background:#10b981; color:white; border:none; border-radius:6px; width:auto; padding:6px 12px; font-size:12px; cursor:pointer; font-weight:600;" class="no-print">✅ Selesai</button>
+                    `;
+                }
+
+                let deleteButtonHtml = currentUserRole === 'admin' ? `<button onclick="hapusPermintaanByKey('${p._key}')" style="background:#ef4444; color:white; border:none; border-radius:6px; width:auto; padding:6px 12px; font-size:12px; cursor:pointer; font-weight:600;" class="no-print">❌</button>` : '';
+
+                let itemsTableRows = p.items.map((i, indexItem) => {
+                    let codeText = i.code && i.code !== '-' ? ` <small style="color:#6366f1;">[${i.code}]</small>` : '';
+                    let isChecked = isDiproses || isDone ? 'checked' : '';
+                    let isDisabledAttr = isDone ? 'disabled' : '';
+                    
+                    let adminGudangActionBtns = '';
+                    if (currentUserRole === 'admin' || currentUserRole === 'gudang') {
+                        adminGudangActionBtns = `
+                            <div style="display:flex; gap:4px; justify-content:center;" class="no-print">
+                                <button onclick="openEditPermintaanItemModal('${p._key}', ${indexItem})" style="background:var(--warning); color:#78350f; border:none; padding:3px 6px; border-radius:4px; font-size:11px; cursor:pointer; font-weight:600;" title="Edit Item">✏️</button>
+                                <button onclick="hapusItemPermintaanDariList('${p._key}', ${indexItem})" style="background:var(--danger); color:white; border:none; padding:3px 6px; border-radius:4px; font-size:11px; cursor:pointer; font-weight:600;" title="Hapus / Kembalikan Item">❌</button>
+                            </div>
                         `;
                     }
 
-                    let deleteButtonHtml = currentUserRole === 'admin' ? `<button onclick="hapusPermintaanByKey('${p._key}')" style="background:#ef4444; color:white; border:none; border-radius:6px; width:auto; padding:6px 12px; font-size:12px; cursor:pointer; font-weight:600;" class="no-print">❌</button>` : '';
+                    return `
+                        <tr>
+                            <td style="border:1px solid #e2e8f0; padding:6px 10px; text-align:center;">
+                                <input type="checkbox" ${isChecked} ${isDisabledAttr} onclick="handleItemCheckboxChange('${p._key}', ${isDiproses})" style="cursor:pointer; width:16px; height:16px; accent-color:var(--primary);">
+                            </td>
+                            <td style="border:1px solid #e2e8f0; padding:6px 10px; text-align:center;">${indexItem + 1}</td>
+                            <td style="border:1px solid #e2e8f0; padding:6px 10px;">${i.item}${codeText}</td>
+                            <td style="border:1px solid #e2e8f0; padding:6px 10px; text-align:center;">${i.qty} ${i.unit}</td>
+                            <td style="border:1px solid #e2e8f0; padding:6px 10px; text-align:center;"><b>${i.totalPcs} Pcs</b></td>
+                            <td style="border:1px solid #e2e8f0; padding:6px 10px; text-align:center;" class="no-print">${adminGudangActionBtns}</td>
+                        </tr>
+                    `;
+                }).join('');
 
-                    // Tabel Daftar Barang dengan Kolom Ceklis
-                    let itemsTableRows = p.items.map((i, indexItem) => {
-                        let codeText = i.code && i.code !== '-' ? ` <small style="color:#6366f1;">[${i.code}]</small>` : '';
-                        let isChecked = isDiproses || isDone ? 'checked' : '';
-                        let isDisabledAttr = isDone ? 'disabled' : '';
-                        
-                        return `
-                            <tr>
-                                <td style="border:1px solid #e2e8f0; padding:6px 10px; text-align:center;">
-                                    <input type="checkbox" ${isChecked} ${isDisabledAttr} onclick="handleItemCheckboxChange('${p._key}', ${isDiproses})" style="cursor:pointer; width:16px; height:16px; accent-color:var(--primary);">
-                                </td>
-                                <td style="border:1px solid #e2e8f0; padding:6px 10px; text-align:center;">${indexItem + 1}</td>
-                                <td style="border:1px solid #e2e8f0; padding:6px 10px;">${i.item}${codeText}</td>
-                                <td style="border:1px solid #e2e8f0; padding:6px 10px; text-align:center;">${i.qty} ${i.unit}</td>
-                                <td style="border:1px solid #e2e8f0; padding:6px 10px; text-align:center;"><b>${i.totalPcs} Pcs</b></td>
-                            </tr>
-                        `;
-                    }).join('');
-
-                    pContainer.innerHTML += `
-                        <div style="background:#f8fafc; padding:14px; border-radius:10px; margin-bottom:12px; border:1px solid #e2e8f0;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-                                <span><b>Departemen: ${p.departemen || '-'}</b> &nbsp; ${badgeStatus}</span>
-                                <div style="display:flex; gap:6px; align-items:center;" class="no-print">
-                                    <button onclick="cetakForm(${actualIdx})" style="background:#64748b; color:white; border:none; border-radius:6px; width:auto; padding:6px 12px; font-size:12px; cursor:pointer; font-weight:600;">🖨️ Cetak</button>
-                                    ${actionBtnText}
-                                    ${deleteButtonHtml}
-                                </div>
+                pContainer.innerHTML += `
+                    <div style="background:#f8fafc; padding:14px; border-radius:10px; margin-bottom:12px; border:1px solid #e2e8f0;">
+                        <div style="font-weight:bold; color:#8b5cf6; margin-bottom:6px; font-size:0.95rem; display:flex; justify-content:space-between; align-items:center;">
+                            <span>👤 Nama: ${p.peminta}</span>
+                            <button onclick="cetakSemuaUserHariIni('${p.peminta}')" style="background:#6366f1; color:white; border:none; border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer; font-weight:600;" class="no-print">🖨️ Cetak Rekap</button>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                            <span><b>Departemen: ${p.departemen || '-'}</b> &nbsp; ${badgeStatus}</span>
+                            <div style="display:flex; gap:6px; align-items:center;" class="no-print">
+                                <button onclick="cetakForm(${actualIdx})" style="background:#64748b; color:white; border:none; border-radius:6px; width:auto; padding:6px 12px; font-size:12px; cursor:pointer; font-weight:600;">🖨️ Cetak</button>
+                                ${actionBtnText}
+                                ${deleteButtonHtml}
                             </div>
-                            
-                            <table style="width:100%; border-collapse:collapse; margin-bottom:8px; font-size:0.85rem; background:#fff;">
-                                <thead>
-                                    <tr style="background:#f1f5f9;">
-                                        <th style="border:1px solid #e2e8f0; padding:6px; width:8%; text-align:center;">Ceklis</th>
-                                        <th style="border:1px solid #e2e8f0; padding:6px; width:8%; text-align:center;">No</th>
-                                        <th style="border:1px solid #e2e8f0; padding:6px;">Nama Barang</th>
-                                        <th style="border:1px solid #e2e8f0; padding:6px; width:20%; text-align:center;">Jumlah</th>
-                                        <th style="border:1px solid #e2e8f0; padding:6px; width:20%; text-align:center;">Total Pcs</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${itemsTableRows}
-                                </tbody>
-                            </table>
-                            <small style="color:#64748b;">📅 Tanggal Permintaan: ${p.tanggal || '-'}</small>
-                        </div>`;
-                });
+                        </div>
+                        
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:8px; font-size:0.85rem; background:#fff;">
+                            <thead>
+                                <tr style="background:#f1f5f9;">
+                                    <th style="border:1px solid #e2e8f0; padding:6px; width:8%; text-align:center;">Ceklis</th>
+                                    <th style="border:1px solid #e2e8f0; padding:6px; width:8%; text-align:center;">No</th>
+                                    <th style="border:1px solid #e2e8f0; padding:6px;">Nama Barang</th>
+                                    <th style="border:1px solid #e2e8f0; padding:6px; width:18%; text-align:center;">Jumlah</th>
+                                    <th style="border:1px solid #e2e8f0; padding:6px; width:18%; text-align:center;">Total Pcs</th>
+                                    <th style="border:1px solid #e2e8f0; padding:6px; width:14%; text-align:center;" class="no-print">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${itemsTableRows}
+                            </tbody>
+                        </table>
+                        <small style="color:#64748b;">📅 Tanggal Permintaan: ${p.tanggal || '-'}</small>
+                    </div>`;
             });
 
             let searchR = document.getElementById('searchRiwayat').value.toLowerCase();
