@@ -649,10 +649,15 @@
     <!-- MODAL EDIT ITEM PERMINTAAN -->
     <div id="editPermintaanItemModal" class="modal">
         <div class="modal-content">
-            <h3 style="margin-bottom:18px; font-size:1.1rem; font-weight:700;">✏️ Edit Jumlah / Barang Permintaan</h3>
+            <h3 style="margin-bottom:18px; font-size:1.1rem; font-weight:700;">✏️ Edit Nama / Barang Permintaan</h3>
             <input type="hidden" id="editReqKey">
             <input type="hidden" id="editReqIndex">
-            <div class="input-group"><label>Nama Barang</label><input type="text" id="editReqItemName" readonly style="background:#f1f5f9;"></div>
+            
+            <div class="input-group">
+                <label>Nama Barang</label>
+                <input type="text" id="editReqItemName" list="listBarangGudang" placeholder="🔍 Ketik atau pilih nama barang..." oninput="autoUpdateEditReqUnitAndCode(this.value)">
+            </div>
+            
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                 <div class="input-group"><label>Jumlah</label><input type="number" id="editReqQty"></div>
                 <div class="input-group"><label>Satuan</label><select id="editReqUnit"></select></div>
@@ -1078,6 +1083,17 @@
             }
         }
 
+        function autoUpdateEditReqUnitAndCode(namaBarang) {
+            let cleanName = namaBarang.trim().toLowerCase();
+            if (!cleanName) return;
+            let foundItem = stok.find(s => s.item.trim().toLowerCase() === cleanName);
+            if (foundItem) {
+                if (foundItem.unit) {
+                    document.getElementById('editReqUnit').value = foundItem.unit;
+                }
+            }
+        }
+
         function updatePalletDropdown() {
             const rackName = document.getElementById('selectRack').value;
             const palletSelect = document.getElementById('selectPallet');
@@ -1193,19 +1209,22 @@
         function saveEditPermintaanItem() {
             let reqKey = document.getElementById('editReqKey').value;
             let itemIndex = parseInt(document.getElementById('editReqIndex').value);
+            let newItemName = document.getElementById('editReqItemName').value.trim();
             let newQty = parseInt(document.getElementById('editReqQty').value);
             let newUnit = document.getElementById('editReqUnit').value;
 
-            if (!newQty || !newUnit) return alert("Jumlah dan Satuan tidak boleh kosong!");
+            if (!newItemName || !newQty || !newUnit) return alert("Nama barang, jumlah, dan satuan tidak boleh kosong!");
 
             let reqObj = permintaan.find(p => p._key === reqKey);
             if (!reqObj || !reqObj.items[itemIndex]) return;
 
-            let targetItem = reqObj.items[itemIndex];
-            let itemInStok = stok.find(s => s.item.trim().toLowerCase() === targetItem.item.trim().toLowerCase());
+            let itemInStok = stok.find(s => s.item.trim().toLowerCase() === newItemName.toLowerCase());
+            let newCode = itemInStok ? (itemInStok.code || '-') : '-';
             let isi = itemInStok ? itemInStok.isiPerUnit : 1;
             let totalPcs = newQty * (newUnit.toLowerCase() !== 'pcs' ? isi : 1);
 
+            reqObj.items[itemIndex].item = newItemName;
+            reqObj.items[itemIndex].code = newCode;
             reqObj.items[itemIndex].qty = newQty;
             reqObj.items[itemIndex].unit = newUnit;
             reqObj.items[itemIndex].totalPcs = totalPcs;
@@ -1423,11 +1442,25 @@
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
         function openAmbilModalByKey(key) { 
-            currentFirebaseKey = key; 
-            document.getElementById('ambilModal').style.display = 'flex'; 
-            document.getElementById('operatorAmbilModal').value = localStorage.getItem('gudang_operator') || ''; 
-            document.getElementById('tujuanAmbilModal').value = ''; 
-        }
+    currentFirebaseKey = key; 
+    let item = stok.find(s => s._key === key);
+    if (!item) return;
+
+    document.getElementById('ambilModal').style.display = 'flex'; 
+    document.getElementById('operatorAmbilModal').value = localStorage.getItem('gudang_operator') || ''; 
+    document.getElementById('tujuanAmbilModal').value = ''; 
+    document.getElementById('qtyAmbil').value = '';
+
+    // Otomatis set dropdown satuan di modal ambil sesuai dengan satuan barang tersebut
+    let unitAmbilSelect = document.getElementById('unitAmbil');
+    unitAmbilSelect.innerHTML = `<option value="${item.unit}" selected>${item.unit}</option>`;
+    
+    // Jika satuan utamanya bukan Pcs, berikan opsi tambahan 'Pcs' untuk fleksibilitas pengambilan
+    if (item.unit.toLowerCase() !== 'pcs') {
+        unitAmbilSelect.innerHTML += `<option value="Pcs">Pcs</option>`;
+    }
+}
+
         
         function openEditModalByKey(key) {
             if(currentUserRole !== 'admin') return alert("Hanya admin yang memiliki hak akses untuk mengedit barang!");
