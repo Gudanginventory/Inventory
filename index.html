@@ -833,7 +833,6 @@
         function saveOperatorFromRequest(val) {
             localStorage.setItem('gudang_operator', val);
             document.getElementById('operatorInput').value = val;
-            // renderAll() dihapus agar pengetikan nama tidak lemot/lag
         }
 
         function updateClock() {
@@ -1081,9 +1080,10 @@
         }
 
         function pilihBarangDariDatalist(namaBarang) {
+            const cleanName = namaBarang.split(' ❌ [STOK HABIS]')[0].trim();
             const selectEl = document.getElementById('reqNamaBarang');
             for (let option of selectEl.options) {
-                if (option.value.toLowerCase() === namaBarang.toLowerCase()) {
+                if (option.value.toLowerCase() === cleanName.toLowerCase()) {
                     selectEl.value = option.value;
                     updateUnitForRequest();
                     break;
@@ -1126,16 +1126,41 @@
         }
 
         function addToDraft() {
-            const itemName = document.getElementById('inputCariReqBarang').value || document.getElementById('reqNamaBarang').value;
+            let rawInputVal = document.getElementById('inputCariReqBarang').value.trim();
+            let itemName = rawInputVal.split(' ❌ [STOK HABIS]')[0].trim();
+            if(!itemName) itemName = document.getElementById('reqNamaBarang').value.trim();
+
+            if(!itemName) return alert("Pilih barang terlebih dahulu!");
+
+            let totalStokPcs = 0;
+            let itemInStok = stok.find(s => s.item.trim().toLowerCase() === itemName.toLowerCase());
+            
+            if (itemInStok) {
+                totalStokPcs = stok
+                    .filter(s => s.item.trim().toLowerCase() === itemName.toLowerCase())
+                    .reduce((sum, s) => sum + s.totalPcs, 0);
+            }
+
+            if (!itemInStok || totalStokPcs <= 0) {
+                return alert(`⚠️ Mohon maaf, stok untuk barang "${itemName}" saat ini sudah HABIS dan tidak dapat diminta!`);
+            }
+
             const qty = parseInt(document.getElementById('reqQty').value);
             const unit = document.getElementById('reqUnit').value;
-            if(!itemName || !qty || !unit) return alert("Pilih barang, isi jumlah, dan satuan!");
-            const itemInStok = stok.find(s => s.item.trim().toLowerCase() === itemName.trim().toLowerCase());
-            const code = itemInStok ? (itemInStok.code || '-') : '-';
-            const isi = itemInStok ? itemInStok.isiPerUnit : 1;
-            const totalPcs = qty * (unit.toLowerCase() !== 'pcs' ? isi : 1);
-            draftItems.push({ item: itemName, code: code, qty, unit, totalPcs });
+            
+            if(!qty || !unit) return alert("Isi jumlah dan satuan dengan lengkap!");
+
+            let totalPcsReq = qty * (unit.toLowerCase() !== 'pcs' ? itemInStok.isiPerUnit : 1);
+            if (totalPcsReq > totalStokPcs) {
+                return alert(`⚠️ Jumlah permintaan (${totalPcsReq} Pcs) melebihi sisa stok gudang (${totalStokPcs} Pcs)!`);
+            }
+
+            const code = itemInStok.code || '-';
+            const isi = itemInStok.isiPerUnit;
+
+            draftItems.push({ item: itemName, code: code, qty, unit, totalPcs: totalPcsReq });
             renderDraft();
+            
             document.getElementById('inputCariReqBarang').value = '';
             document.getElementById('reqNamaBarang').value = '';
             document.getElementById('reqQty').value = '';
@@ -1647,12 +1672,14 @@
                 let itemObj = totalStokPerItem[key];
                 let combinedCodes = itemObj.codes.filter(c => c !== '-').join(', ').trim();
                 let isHabis = itemObj.totalPcs <= 0;
-                let statusLabel = isHabis ? ' - (Stok Kosong/Habis)' : '';
+                let statusLabel = isHabis ? ' ❌ [STOK HABIS]' : '';
                 let label = combinedCodes ? `[${combinedCodes}] ${itemObj.displayName}` : itemObj.displayName;
                 
-                datalistHtml += `<option value="${itemObj.displayName}" data-unit="${itemObj.unit}">`;
+                let displayValue = `${itemObj.displayName}${statusLabel}`;
+                datalistHtml += `<option value="${displayValue}" data-unit="${itemObj.unit}">`;
+                
                 if (isHabis) {
-                    optionsReqHtml += `<option value="${itemObj.displayName}" data-unit="${itemObj.unit}" disabled style="color: #ef4444; background: #fee2e2;">${label} ${statusLabel} (Satuan: ${itemObj.unit})</option>`;
+                    optionsReqHtml += `<option value="${itemObj.displayName}" data-unit="${itemObj.unit}" disabled style="color: #ef4444; background: #fee2e2;">${label} ❌ [STOK HABIS] (Satuan: ${itemObj.unit})</option>`;
                 } else {
                     optionsReqHtml += `<option value="${itemObj.displayName}" data-unit="${itemObj.unit}">${label} (Satuan: ${itemObj.unit})</option>`;
                 }
